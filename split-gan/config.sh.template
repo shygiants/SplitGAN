@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+
+JOB_DIR=/your/job/dir
+DATASET_DIR=/your/dataset/dir
