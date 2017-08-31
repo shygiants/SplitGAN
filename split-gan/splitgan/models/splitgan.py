@@ -20,6 +20,7 @@ def model_fn(features, labels, mode, params):
     beta2 = params['beta2']
     lambda1 = params['lambda1']
     lambda2 = params['lambda2']
+    use_avg_pool = params['use_avg_pool']
 
     with tf.variable_scope('SplitGAN', values=[x_a, x_b]):
         add_arg_scope(tf.layers.conv2d)
@@ -32,7 +33,9 @@ def model_fn(features, labels, mode, params):
 
                     # z is split into c_b, z_a-b
                     c_b, z_a_b = tf.split(z_a, num_or_size_splits=2, axis=3)
-                    z_a_b = tf.reduce_mean(z_a_b, axis=[1, 2], keep_dims=True)
+
+                    if use_avg_pool:
+                        z_a_b = tf.reduce_mean(z_a_b, axis=[1, 2], keep_dims=True)
 
                     outputs_ab = decoder(c_b, num_layers, scope='Decoder_B', initial_depth=16)
 
@@ -42,9 +45,12 @@ def model_fn(features, labels, mode, params):
                 with tf.variable_scope('Generator_BA', values=[inputs_b], reuse=reuse):
                     z_b = encoder(inputs_b, num_layers, scope='Encoder_B', initial_depth=16)
 
+                    if use_avg_pool:
+
+                        height = tf.shape(z_b)[1]
+                        z_a_b = tf.tile(z_a_b, [1, height, height, 1])
+
                     # Concat z_b and z_a-b
-                    height = tf.shape(z_b)[1]
-                    z_a_b = tf.tile(z_a_b, [1, height, height, 1])
                     c_a = tf.concat([z_b, z_a_b], 3)
 
                     outputs_ba = decoder(c_a, num_layers, scope='Decoder_A')

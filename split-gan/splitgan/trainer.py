@@ -11,6 +11,7 @@ from models import models_factory
 
 def run(job_dir,
         model_name,
+        use_avg_pool,
         paired_dataset,
         domain_a,
         domain_b,
@@ -61,6 +62,7 @@ def run(job_dir,
         'lambda2': lambda2,
         'weight_decay': weight_decay,
         'num_layers': num_layers,
+        'use_avg_pool': use_avg_pool,
     }
 
     session_config = None
@@ -90,6 +92,14 @@ def run(job_dir,
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
+    def str2bool(v):
+        if v.lower() in ('yes', 'true', 't', 'y', '1'):
+            return True
+        elif v.lower() in ('no', 'false', 'f', 'n', '0'):
+            return False
+        else:
+            raise argparse.ArgumentTypeError('Boolean value expected.')
+
     ###############
     # Directories #
     ###############
@@ -113,6 +123,10 @@ if __name__ == '__main__':
                         help='The name of the model to use.',
                         choices=models_factory.models_map.keys(),
                         default='splitgan')
+    parser.add_argument('--use-avg-pool',
+                        type=str2bool,
+                        default=True,
+                        help='Whether to use average pooling')
 
     ############
     # Datasets #
