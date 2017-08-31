@@ -26,6 +26,8 @@ def run(job_dir,
         lambda2,
         weight_decay,
         num_layers,
+        depth,
+        split_rate,
         gpu):
 
     def input_fn(dataset, batch_size):
@@ -62,8 +64,19 @@ def run(job_dir,
         'lambda2': lambda2,
         'weight_decay': weight_decay,
         'num_layers': num_layers,
+        'depth': depth,
+        'split_rate': split_rate,
         'use_avg_pool': use_avg_pool,
     }
+    job_dir = os.path.join(job_dir,
+                           str(num_layers),
+                           str(split_rate),
+                           str(alpha1),
+                           str(alpha2),
+                           str(beta1),
+                           str(beta2),
+                           str(lambda1),
+                           str(lambda2))
 
     session_config = None
     if gpu is not None:
@@ -72,7 +85,6 @@ def run(job_dir,
                 visible_device_list=gpu
             )
         )
-        job_dir = os.path.join(job_dir, gpu)
 
     # Define models
     model_fn = models_factory.get_model(model_name)
@@ -190,6 +202,14 @@ if __name__ == '__main__':
                         type=int,
                         default=4,
                         help='Number of layers')
+    parser.add_argument('--depth',
+                        type=int,
+                        default=32,
+                        help='Initial depth of ConvNets')
+    parser.add_argument('--split-rate',
+                        type=int,
+                        default=0,
+                        help='Split rate of z_a')
 
     ##############
     # Run Config #

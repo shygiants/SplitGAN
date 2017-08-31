@@ -1,5 +1,7 @@
 """ SplitGAN implementation """
 
+import math
+
 import tensorflow as tf
 from tensorflow.python.estimator.model_fn import ModeKeys as Modes
 from tensorflow.contrib.framework import arg_scope, add_arg_scope
@@ -14,6 +16,8 @@ def model_fn(features, labels, mode, params):
     # Hyperparameters
     weight_decay = params['weight_decay']
     num_layers = params['num_layers']
+    depth = params['depth']
+    split_rate = params['split_rate']
     alpha1 = params['alpha1']
     alpha2 = params['alpha2']
     beta1 = params['beta1']
@@ -22,6 +26,11 @@ def model_fn(features, labels, mode, params):
     lambda2 = params['lambda2']
     use_avg_pool = params['use_avg_pool']
 
+    latent_depth = depth * 2 ** (num_layers - 1)
+    log_depth = int(math.log(latent_depth, 2))
+    log_depth_b = log_depth - 1 - split_rate
+    depth_b = 2 ** log_depth_b
+
     with tf.variable_scope('SplitGAN', values=[x_a, x_b]):
         add_arg_scope(tf.layers.conv2d)
         # TODO: Save random seeds of initializers
@@ -29,21 +38,25 @@ def model_fn(features, labels, mode, params):
                        kernel_regularizer=tf.contrib.layers.l2_regularizer(weight_decay)):
             def generator_ab(inputs_a, reuse=None):
                 with tf.variable_scope('Generator_AB', values=[inputs_a], reuse=reuse):
-                    z_a = encoder(inputs_a, num_layers, scope='Encoder_A')
+                    z_a = encoder(inputs_a, num_layers, initial_depth=depth, scope='Encoder_A')
 
                     # z is split into c_b, z_a-b
-                    c_b, z_a_b = tf.split(z_a, num_or_size_splits=2, axis=3)
+                    c_b, z_a_b = tf.split(z_a,
+                                          num_or_size_splits=[depth_b, latent_depth - depth_b],
+                                          axis=3)
 
                     if use_avg_pool:
                         z_a_b = tf.reduce_mean(z_a_b, axis=[1, 2], keep_dims=True)
 
-                    outputs_ab = decoder(c_b, num_layers, scope='Decoder_B', initial_depth=16)
+                    outputs_ab = decoder(c_b, num_layers, scope='Decoder_B',
+                                         initial_depth=depth / 2 ** (1 + split_rate))
 
                 return outputs_ab, z_a_b
 
             def generator_ba(inputs_b, z_a_b, reuse=None):
                 with tf.variable_scope('Generator_BA', values=[inputs_b], reuse=reuse):
-                    z_b = encoder(inputs_b, num_layers, scope='Encoder_B', initial_depth=16)
+                    z_b = encoder(inputs_b, num_layers, scope='Encoder_B',
+                                  initial_depth=depth / 2 ** (1 + split_rate))
 
                     if use_avg_pool:
 
@@ -53,7 +66,7 @@ def model_fn(features, labels, mode, params):
                     # Concat z_b and z_a-b
                     c_a = tf.concat([z_b, z_a_b], 3)
 
-                    outputs_ba = decoder(c_a, num_layers, scope='Decoder_A')
+                    outputs_ba = decoder(c_a, num_layers, initial_depth=depth, scope='Decoder_A')
 
                 return outputs_ba
 
@@ -130,15 +143,19 @@ def model_fn(features, labels, mode, params):
             tf.summary.scalar('L_G_A', l_g_a)
             tf.summary.scalar('L_G_B', l_g_b)
 
-        with tf.name_scope('hyperparameters'):
-            tf.summary.scalar('alpha1', alpha1)
-            tf.summary.scalar('alpha2', alpha2)
-            tf.summary.scalar('beta1', beta1)
-            tf.summary.scalar('beta2', beta2)
-            tf.summary.scalar('lambda1', lambda1)
-            tf.summary.scalar('lambda2', lambda2)
-
         def get_train_op(learning_rate, loss, var_list):
+            start_decay_step = 100000
+            decay_steps = 100000
+            starter_learning_rate = learning_rate
+            end_learning_rate = 0.0
+
+            learning_rate = tf.where(
+                tf.greater_equal(global_step, start_decay_step),
+                tf.train.polynomial_decay(starter_learning_rate, global_step - start_decay_step,
+                                          decay_steps, end_learning_rate,
+                                          power=1.0),
+                starter_learning_rate)
+
             optimizer = tf.train.AdamOptimizer(
                 learning_rate=learning_rate,
                 beta1=0.5,
@@ -146,15 +163,23 @@ def model_fn(features, labels, mode, params):
             )
             grads = optimizer.compute_gradients(loss, var_list=var_list)
             tf.contrib.training.add_gradients_summaries(grads)
-            return optimizer.apply_gradients(grads, global_step=global_step)
+            return optimizer.apply_gradients(grads, global_step=global_step), learning_rate
 
-        train_op_d_a = get_train_op(alpha1, l_d_a, d_a_vars)
-        train_op_d_b = get_train_op(alpha2, l_d_b, d_b_vars)
-        train_op_g_a = get_train_op(beta1, l_g_a, g_vars)
-        train_op_g_b = get_train_op(beta2, l_g_b, g_vars)
+        train_op_d_a, alpha1 = get_train_op(alpha1, l_d_a, d_a_vars)
+        train_op_d_b, alpha2 = get_train_op(alpha2, l_d_b, d_b_vars)
+        train_op_g_a, beta1 = get_train_op(beta1, l_g_a, g_vars)
+        train_op_g_b, beta2 = get_train_op(beta2, l_g_b, g_vars)
 
         train_ops = [train_op_d_a, train_op_d_b, train_op_g_a, train_op_g_b]
         train_op = run_train_ops_stepwise(train_ops, global_step)
+
+        with tf.name_scope('hyperparameters'):
+            tf.summary.scalar('alpha1', alpha1)
+            tf.summary.scalar('alpha2', alpha2)
+            tf.summary.scalar('beta1', beta1)
+            tf.summary.scalar('beta2', beta2)
+            tf.summary.scalar('lambda1', lambda1)
+            tf.summary.scalar('lambda2', lambda2)
 
     # Image summaries
     images_a_concat = tf.concat(

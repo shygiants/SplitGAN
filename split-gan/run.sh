@@ -21,13 +21,15 @@ if [ $1 = "train" ]; then
         --dataset-dir $DATASET_DIR \
         --paired-dataset edges2shoes \
         --train-batch-size 1 \
-        --train-steps 100000 \
+        --train-steps 200000 \
+        --num-layers 4 \
+        --split-rate 1 \
         --alpha1 0.00001 \
         --alpha2 0.00001 \
         --beta1 0.00015 \
         --beta2 0.00015 \
-        --lambda1 4.0 \
-        --lambda2 4.0
+        --lambda1 10.0 \
+        --lambda2 10.0
 elif [ $1 = "tensorboard" ]; then
     tensorboard --logdir=$JOB_DIR --host=0.0.0.0
 else
