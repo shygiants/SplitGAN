@@ -20,13 +20,13 @@ function print-running() {
     fi
 }
 
-if [ $1 = "train" ]; then
+if [ $1 = "train" ] || [ $1 = "hypertune" ]; then
     print-running $@
 elif [ $1 = "tensorboard" ]; then
     print-running $@
     PORT="-p 6006:6006"
 else
-    echo "Usage: run_docker.sh [train|tensorboard]"
+    echo "Usage: run_docker.sh [train|hypertune|tensorboard]"
     exit 1
 fi
 

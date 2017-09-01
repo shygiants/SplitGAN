@@ -77,6 +77,9 @@ def run(job_dir,
                            str(beta2),
                            str(lambda1),
                            str(lambda2))
+    if tf.gfile.Exists(job_dir):
+        print 'Training is already done. Skip it. {}'.format(job_dir)
+        return
 
     session_config = None
     if gpu is not None:
