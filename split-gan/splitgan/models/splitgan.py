@@ -6,7 +6,7 @@ import tensorflow as tf
 from tensorflow.python.estimator.model_fn import ModeKeys as Modes
 from tensorflow.contrib.framework import arg_scope, add_arg_scope
 
-from utils import encoder, decoder, discriminator, normalize_images, run_train_ops_stepwise
+from utils import encoder, decoder, discriminator, normalize_images, run_train_ops_stepwise, transformer
 
 
 def model_fn(features, labels, mode, params):
@@ -17,6 +17,7 @@ def model_fn(features, labels, mode, params):
     weight_decay = params['weight_decay']
     num_layers = params['num_layers']
     depth = params['depth']
+    num_blocks = params['num_blocks']
     split_rate = params['split_rate']
     alpha1 = params['alpha1']
     alpha2 = params['alpha2']
@@ -59,12 +60,17 @@ def model_fn(features, labels, mode, params):
                                   initial_depth=depth / 2 ** (1 + split_rate))
 
                     if use_avg_pool:
-
                         height = tf.shape(z_b)[1]
                         z_a_b = tf.tile(z_a_b, [1, height, height, 1])
 
                     # Concat z_b and z_a-b
                     c_a = tf.concat([z_b, z_a_b], 3)
+
+                    ####################
+                    # Transformer part #
+                    ####################
+                    c_a = transformer(c_a, latent_depth, num_blocks=num_blocks,
+                                      scope='Transformer_A', reuse=reuse)
 
                     outputs_ba = decoder(c_a, num_layers, initial_depth=depth, scope='Decoder_A')
 

@@ -27,6 +27,7 @@ def run(job_dir,
         weight_decay,
         num_layers,
         depth,
+        num_blocks,
         split_rate,
         gpu):
 
@@ -65,6 +66,7 @@ def run(job_dir,
         'weight_decay': weight_decay,
         'num_layers': num_layers,
         'depth': depth,
+        'num_blocks': num_blocks,
         'split_rate': split_rate,
         'use_avg_pool': use_avg_pool,
     }
@@ -209,6 +211,10 @@ if __name__ == '__main__':
                         type=int,
                         default=32,
                         help='Initial depth of ConvNets')
+    parser.add_argument('--num-blocks',
+                        type=int,
+                        default=9,
+                        help='Number of ResNet blocks')
     parser.add_argument('--split-rate',
                         type=int,
                         default=0,
