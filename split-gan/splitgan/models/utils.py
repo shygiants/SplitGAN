@@ -108,6 +108,40 @@ def decoder(inputs, num_layers, kernel_size=3, initial_depth=32, scope=None, reu
     return inputs
 
 
+def resnet_block(inputs, num_features, scope=None, reuse=None):
+    shortcut = inputs
+    with tf.variable_scope(scope, 'ResNet_Block', [inputs], reuse=reuse):
+        # Layer 1
+        inputs = reflection_pad(inputs, 1)
+        inputs = tf.layers.conv2d(inputs,
+                                  num_features,
+                                  3,
+                                  strides=(1, 1),
+                                  padding='VALID',
+                                  name='Conv2d_0_{}'.format(num_features))
+        inputs = instance_norm(inputs)
+        inputs = tf.nn.relu(inputs)
+
+        # Layer 2
+        inputs = reflection_pad(inputs, 1)
+        inputs = tf.layers.conv2d(inputs,
+                                  num_features,
+                                  3,
+                                  strides=(1, 1),
+                                  padding='VALID',
+                                  name='Conv2d_1_{}'.format(num_features))
+        inputs = instance_norm(inputs)
+
+    return inputs + shortcut
+
+
+def transformer(inputs, num_features, num_blocks=6, scope=None, reuse=None):
+    with tf.variable_scope(scope, 'Transformer', [inputs], reuse=reuse):
+        for i in range(num_blocks):
+            inputs = resnet_block(inputs, num_features, scope='ResNet_Block_{}'.format(i))
+    return inputs
+
+
 def discriminator(inputs, num_layers, kernel_size=4, initial_depth=64, scope=None, reuse=None):
     with tf.variable_scope(scope, 'Discriminator', [inputs], reuse=reuse):
         lrelu = leaky_relu_fn(0.2)
