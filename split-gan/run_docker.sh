@@ -5,7 +5,7 @@ REPOSITORY="shygiants/split-gan"
 PORT=""
 
 # TODO: Check the number of gpus
-if [ -z "$2" ]; then
+if [ $1 = "tensorboard" ] || [ -z "$2" ]; then
     CONTAINER_NAME="sg-$1"
 else
     CONTAINER_NAME="sg-$1-gpu-$2"
@@ -13,7 +13,7 @@ fi
 
 
 function print-running() {
-    if [ -z "$2" ]; then
+    if [ $1 = "tensorboard" ] || [ -z "$2" ]; then
         echo "Running $1..."
     else
         echo "Running $1 on GPU $2..."
