@@ -17,6 +17,7 @@ def run(job_dir,
         domain_b,
         dataset_dir,
         train_batch_size,
+        eval_batch_size,
         train_steps,
         alpha1,
         alpha2,
@@ -42,17 +43,24 @@ def run(job_dir,
 
     # Define datasets
     print paired_dataset
-    if paired_dataset is not None:
-        dataset_train = datasets_factory.get_dataset(paired_dataset, 'train', dataset_dir)
-        dataset_train = dataset_train.map(
-            lambda ft, lbl: ({'x_a': ft['image/2'], 'x_b': ft['image/1']}, lbl))
-    else:
-        dataset_a_train = datasets_factory.get_dataset(domain_a, 'train', dataset_dir)
-        dataset_b_train = datasets_factory.get_dataset(domain_b, 'train', dataset_dir)
 
-        dataset_train = tf.contrib.data.Dataset.zip((dataset_a_train, dataset_b_train))
-        dataset_train = dataset_train.map(
-            lambda a, b: ({'x_a': a[0]['image'], 'x_b': b[0]['image']}, {'label_a': a[1], 'label_b': b[1]}))
+    def get_dataset(split_name):
+        if paired_dataset is not None:
+            dataset = datasets_factory.get_dataset(paired_dataset, split_name, dataset_dir)
+            dataset = dataset.map(
+                lambda ft, lbl: ({'x_a': ft['image/2'], 'x_b': ft['image/1']}, lbl))
+        else:
+            dataset_a = datasets_factory.get_dataset(domain_a, split_name, dataset_dir)
+            dataset_b = datasets_factory.get_dataset(domain_b, split_name, dataset_dir)
+
+            dataset = tf.contrib.data.Dataset.zip((dataset_a, dataset_b))
+            dataset = dataset.map(
+                lambda a, b: ({'x_a': a[0]['image'], 'x_b': b[0]['image']}, {'label_a': a[1], 'label_b': b[1]}))
+
+        return dataset
+
+    dataset_train = get_dataset('train')
+    dataset_valid = get_dataset('valid').take(eval_batch_size)
 
     # Hyperparameters
     params = {
@@ -94,14 +102,22 @@ def run(job_dir,
     estimator = tf.estimator.Estimator(
         model_fn,
         model_dir=job_dir,
-        config=tf.estimator.RunConfig().replace(session_config=session_config),
+        config=tf.estimator.RunConfig().replace(session_config=session_config,
+                                                save_summary_steps=1000),
         params=params)
 
-    # Run train
-    estimator.train(functools.partial(input_fn,
-                                      dataset=dataset_train,
-                                      batch_size=train_batch_size),
-                    steps=train_steps)
+    eval_steps = 5000
+    for _ in range(train_steps/eval_steps):
+        # Run train
+        estimator.train(functools.partial(input_fn,
+                                          dataset=dataset_train,
+                                          batch_size=train_batch_size),
+                        steps=eval_steps)
+        estimator.evaluate(functools.partial(input_fn,
+                                             dataset=dataset_valid,
+                                             batch_size=eval_batch_size),
+                           steps=1,
+                           hooks=[tf.contrib.training.SummaryAtEndHook(log_dir=os.path.join(job_dir, 'eval'))])
 
 
 if __name__ == '__main__':
@@ -173,6 +189,10 @@ if __name__ == '__main__':
                         type=int,
                         default=64,
                         help='Batch size for training steps')
+    parser.add_argument('--eval-batch-size',
+                        type=int,
+                        default=5,
+                        help='Batch size for eval steps')
     parser.add_argument('--alpha1',
                         type=float,
                         default=0.0002,

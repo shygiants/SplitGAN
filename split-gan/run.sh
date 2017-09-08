@@ -54,12 +54,12 @@ function hypertune() {
 }
 if [ $1 = "train" ]; then
     train \
-        0.00001 \
-        0.00001 \
+        0.000015 \
+        0.000015 \
         0.00015 \
         0.00015 \
-        12.0 \
-        5.0
+        10.0 \
+        10.0
 elif [ $1 = "hypertune" ]; then
     hypertune
 elif [ $1 = "tensorboard" ]; then

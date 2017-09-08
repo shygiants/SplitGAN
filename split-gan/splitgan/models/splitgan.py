@@ -143,6 +143,7 @@ def model_fn(features, labels, mode, params):
             tf.summary.scalar('L_G_A', l_g_a)
             tf.summary.scalar('L_G_B', l_g_b)
 
+    if mode == Modes.TRAIN:
         def get_train_op(learning_rate, loss, var_list):
             start_decay_step = 100000
             decay_steps = 100000
