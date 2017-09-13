@@ -4,6 +4,7 @@ TRAINER_PACKAGE_PATH=splitgan
 MAIN_TRAINER_MODULE=splitgan.trainer
 
 JOB_DIR="/job-dir"
+LOG_DIR="/job-dir"
 DATASET_DIR="/dataset"
 
 if [ -z "$2" ]; then
@@ -36,8 +37,8 @@ function hypertune() {
         for j in $(seq -w 0.00001 0.000005 0.000021); do #3
             for k in $(seq -w 0.0001 0.00005 0.00021); do #3
                 for l in $(seq -w 0.0001 0.00005 0.00021); do #3
-                    for m in $(seq -w 1.0 4.0 15.0); do #4
-                        for n in $(seq -w 9.0 4.0 15.0); do #4
+                    for m in $(seq -w 5.0 4.0 15.0); do #3
+                        for n in $(seq -w 5.0 4.0 15.0); do #3
                             train \
                                 ${i} \
                                 ${j} \
@@ -54,16 +55,16 @@ function hypertune() {
 }
 if [ $1 = "train" ]; then
     train \
-        0.000015 \
-        0.000015 \
-        0.00015 \
-        0.00015 \
+        0.00000001 \
+        0.00000001 \
+        0.000001 \
+        0.000001 \
         10.0 \
         10.0
 elif [ $1 = "hypertune" ]; then
     hypertune
 elif [ $1 = "tensorboard" ]; then
-    tensorboard --logdir=${JOB_DIR}/$2 --host=0.0.0.0
+    tensorboard --logdir=${LOG_DIR} --host=0.0.0.0
 else
     echo "Usage: run.sh [train|hypertune|tensorboard]"
     exit 1
