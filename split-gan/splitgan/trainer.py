@@ -79,6 +79,7 @@ def run(job_dir,
         'use_avg_pool': use_avg_pool,
     }
     job_dir = os.path.join(job_dir,
+                           str(depth),
                            str(num_layers),
                            str(split_rate),
                            str(alpha1),
