@@ -26,6 +26,7 @@ def model_fn(features, labels, mode, params):
     lambda1 = params['lambda1']
     lambda2 = params['lambda2']
     use_avg_pool = params['use_avg_pool']
+    use_joint_discr = params['use_joint_discr']
 
     latent_depth = depth * 2 ** (num_layers - 1)
     log_depth = int(math.log(latent_depth, 2))
@@ -89,7 +90,7 @@ def model_fn(features, labels, mode, params):
 
             if mode == Modes.TRAIN or mode == Modes.EVAL:
                 x_aba = generator_ba(x_ab, z_a_b, reuse=True)
-                x_bab, _ = generator_ab(x_ba, reuse=True)
+                x_bab, z_a_b_fake = generator_ab(x_ba, reuse=True)
 
                 images_a.append(x_aba)
                 images_b.append(x_bab)
@@ -97,10 +98,18 @@ def model_fn(features, labels, mode, params):
                 ######################
                 # Discriminator part #
                 ######################
-                logits_a_real, probs_a_real = discriminator(x_a, num_layers, scope='Discriminator_A')
+                def joint(x, z):
+                    if use_joint_discr:
+                        height = tf.shape(x)[1]
+                        z = tf.tile(z, [1, height, height, 1])
+                        return tf.concat([x, z], 3, name='joint')
+                    else:
+                        return x
+
+                logits_a_real, probs_a_real = discriminator(joint(x_a, z_a_b), num_layers, scope='Discriminator_A')
                 logits_b_real, probs_b_real = discriminator(x_b, num_layers, scope='Discriminator_B')
                 logits_b_fake, probs_b_fake = discriminator(x_ab, num_layers, scope='Discriminator_B', reuse=True)
-                logits_a_fake, probs_a_fake = discriminator(x_ba, num_layers, scope='Discriminator_A', reuse=True)
+                logits_a_fake, probs_a_fake = discriminator(joint(x_ba, z_a_b_fake), num_layers, scope='Discriminator_A', reuse=True)
 
     if mode == Modes.TRAIN or mode == Modes.EVAL:
         ##########
