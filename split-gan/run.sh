@@ -23,8 +23,8 @@ function train() {
         --train-batch-size 1 \
         --train-steps 200000 \
         --num-layers 4 \
-        --depth 32 \
-        --split-rate 0 \
+        --depth 64 \
+        --split-rate 2 \
         --alpha1 $1 \
         --alpha2 $2 \
         --beta1 $3 \
@@ -56,10 +56,10 @@ function hypertune() {
 }
 if [ $1 = "train" ]; then
     train \
-        0.0000001 \
-        0.0000001 \
-        0.00002 \
-        0.00002 \
+        0.00001 \
+        0.00001 \
+        0.00015 \
+        0.00015 \
         10.0 \
         10.0
 elif [ $1 = "hypertune" ]; then
