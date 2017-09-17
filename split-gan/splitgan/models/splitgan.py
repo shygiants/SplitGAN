@@ -6,7 +6,7 @@ import tensorflow as tf
 from tensorflow.python.estimator.model_fn import ModeKeys as Modes
 from tensorflow.contrib.framework import arg_scope, add_arg_scope
 
-from utils import encoder, decoder, discriminator, normalize_images, run_train_ops_stepwise, transformer
+from utils import encoder, decoder, discriminator, normalize_images, run_train_ops_stepwise, transformer, joint_discriminator
 
 
 def model_fn(features, labels, mode, params):
@@ -106,10 +106,10 @@ def model_fn(features, labels, mode, params):
                     else:
                         return x
 
-                logits_a_real, probs_a_real = discriminator(joint(x_a, z_a_b), num_layers, scope='Discriminator_A')
+                logits_a_real, probs_a_real = joint_discriminator(x_a, z_a_b, num_layers, scope='Discriminator_A')
                 logits_b_real, probs_b_real = discriminator(x_b, num_layers, scope='Discriminator_B')
                 logits_b_fake, probs_b_fake = discriminator(x_ab, num_layers, scope='Discriminator_B', reuse=True)
-                logits_a_fake, probs_a_fake = discriminator(joint(x_ba, z_a_b_fake), num_layers, scope='Discriminator_A', reuse=True)
+                logits_a_fake, probs_a_fake = joint_discriminator(x_ba, z_a_b_fake, num_layers, scope='Discriminator_A', reuse=True)
 
     if mode == Modes.TRAIN or mode == Modes.EVAL:
         ##########
