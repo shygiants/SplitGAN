@@ -6,7 +6,8 @@ import tensorflow as tf
 from tensorflow.python.estimator.model_fn import ModeKeys as Modes
 from tensorflow.contrib.framework import arg_scope, add_arg_scope
 
-from utils import encoder, decoder, discriminator, normalize_images, run_train_ops_stepwise, transformer
+from utils import encoder, decoder, discriminator, \
+    normalize_images, run_train_ops_stepwise, transformer, instance_norm
 
 
 def model_fn(features, labels, mode, params):
@@ -47,7 +48,18 @@ def model_fn(features, labels, mode, params):
                                           axis=3)
 
                     if use_avg_pool:
-                        z_a_b = tf.reduce_mean(z_a_b, axis=[1, 2], keep_dims=True)
+                        with tf.variable_scope('Pool', values=[z_a_b]):
+                            for n in range(2):
+                                with tf.variable_scope('Conv2d_{}_{}'.format(n, latent_depth - depth_b), values=[z_a_b]):
+                                    z_a_b = tf.layers.conv2d(z_a_b,
+                                                             latent_depth - depth_b,
+                                                             3,
+                                                             strides=(2, 2),
+                                                             padding='SAME',
+                                                             use_bias=False)
+                                    z_a_b = instance_norm(z_a_b)
+                                    z_a_b = tf.nn.relu(z_a_b)
+                            z_a_b = tf.reduce_mean(z_a_b, axis=[1, 2], keep_dims=True)
 
                     outputs_ab = decoder(c_b, num_layers, scope='Decoder_B',
                                          initial_depth=depth / 2 ** (1 + split_rate))
