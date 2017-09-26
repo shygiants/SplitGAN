@@ -7,7 +7,7 @@ from tensorflow.python.estimator.model_fn import ModeKeys as Modes
 from tensorflow.contrib.framework import arg_scope, add_arg_scope
 
 from utils import encoder, decoder, discriminator, \
-    normalize_images, run_train_ops_stepwise, transformer, instance_norm
+    normalize_images, run_train_ops_stepwise, transformer, instance_norm, downsample
 
 
 def model_fn(features, labels, mode, params):
@@ -32,6 +32,9 @@ def model_fn(features, labels, mode, params):
     log_depth = int(math.log(latent_depth, 2))
     log_depth_b = log_depth - 1 - split_rate
     depth_b = 2 ** log_depth_b
+    depth_a_b = latent_depth - depth_b
+
+    num_downsample = 2
 
     with tf.variable_scope('SplitGAN', values=[x_a, x_b]):
         add_arg_scope(tf.layers.conv2d)
@@ -44,22 +47,12 @@ def model_fn(features, labels, mode, params):
 
                     # z is split into c_b, z_a-b
                     c_b, z_a_b = tf.split(z_a,
-                                          num_or_size_splits=[depth_b, latent_depth - depth_b],
+                                          num_or_size_splits=[depth_b, depth_a_b],
                                           axis=3)
 
                     if use_avg_pool:
-                        with tf.variable_scope('Pool', values=[z_a_b]):
-                            for n in range(2):
-                                with tf.variable_scope('Conv2d_{}_{}'.format(n, latent_depth - depth_b), values=[z_a_b]):
-                                    z_a_b = tf.layers.conv2d(z_a_b,
-                                                             latent_depth - depth_b,
-                                                             3,
-                                                             strides=(2, 2),
-                                                             padding='SAME',
-                                                             use_bias=False)
-                                    z_a_b = instance_norm(z_a_b)
-                                    z_a_b = tf.nn.relu(z_a_b)
-                            z_a_b = tf.reduce_mean(z_a_b, axis=[1, 2], keep_dims=True)
+                        z_a_b = downsample(z_a_b, num_downsample, depth_a_b)
+                        z_a_b = tf.reduce_mean(z_a_b, axis=[1, 2], keep_dims=True)
 
                     outputs_ab = decoder(c_b, num_layers, scope='Decoder_B',
                                          initial_depth=depth / 2 ** (1 + split_rate))
@@ -81,7 +74,7 @@ def model_fn(features, labels, mode, params):
                     ####################
                     # Transformer part #
                     ####################
-                    c_a = transformer(c_a, latent_depth, num_blocks=num_blocks,
+                    c_a = transformer(c_a, depth_b + depth_a_b * 2 ** num_downsample, num_blocks=num_blocks,
                                       scope='Transformer_A', reuse=reuse)
 
                     outputs_ba = decoder(c_a, num_layers, initial_depth=depth, scope='Decoder_A')

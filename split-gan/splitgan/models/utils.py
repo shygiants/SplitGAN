@@ -82,6 +82,23 @@ def encoder(inputs, num_layers, kernel_size=3, initial_depth=32, scope=None, reu
     return inputs
 
 
+def downsample(inputs, num_layers, initial_depth, kernel_size=3, scope=None, reuse=None):
+    with tf.variable_scope('Pool', values=[inputs]):
+        for n in range(num_layers):
+            depth = initial_depth * 2 ** (n + 1)
+            with tf.variable_scope('Conv2d_{}_{}'.format(n, depth), values=[inputs]):
+                inputs = tf.layers.conv2d(inputs,
+                                          depth,
+                                          kernel_size,
+                                          strides=(2, 2),
+                                          padding='SAME',
+                                          use_bias=False)
+                inputs = instance_norm(inputs)
+                inputs = tf.nn.relu(inputs)
+
+    return inputs
+
+
 def decoder(inputs, num_layers, kernel_size=3, initial_depth=32, scope=None, reuse=None):
     with tf.variable_scope(scope, 'Decoder', [inputs], reuse=reuse):
         for n in range(num_layers - 1):
