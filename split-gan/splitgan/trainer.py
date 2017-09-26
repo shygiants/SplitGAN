@@ -31,7 +31,8 @@ def run(job_dir,
         depth,
         num_blocks,
         split_rate,
-        gpu):
+        gpu,
+        skip):
 
     def input_fn(dataset, batch_size):
         dataset = dataset.shuffle(buffer_size=10000)
@@ -90,7 +91,7 @@ def run(job_dir,
                            str(beta2),
                            str(lambda1),
                            str(lambda2))
-    if tf.gfile.Exists(job_dir):
+    if skip and tf.gfile.Exists(job_dir):
         print 'Training is already done. Skip it. {}'.format(job_dir)
         return
 
@@ -200,7 +201,7 @@ if __name__ == '__main__':
                         help='Batch size for training steps')
     parser.add_argument('--eval-batch-size',
                         type=int,
-                        default=5,
+                        default=10,
                         help='Batch size for eval steps')
     parser.add_argument('--alpha1',
                         type=float,
@@ -254,6 +255,10 @@ if __name__ == '__main__':
                         type=str,
                         help='GPU ids for training.',
                         default=None)
+    parser.add_argument('--skip',
+                        type=str2bool,
+                        default=False,
+                        help='Whether to skip if the directory already exists')
     parser.add_argument('--verbosity',
                         choices=[
                             'DEBUG',

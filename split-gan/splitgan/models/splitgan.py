@@ -106,10 +106,26 @@ def model_fn(features, labels, mode, params):
                     else:
                         return x
 
-                logits_a_real, probs_a_real = joint_discriminator(x_a, z_a_b, num_layers, scope='Discriminator_A')
-                logits_b_real, probs_b_real = discriminator(x_b, num_layers, scope='Discriminator_B')
-                logits_b_fake, probs_b_fake = discriminator(x_ab, num_layers, scope='Discriminator_B', reuse=True)
-                logits_a_fake, probs_a_fake = joint_discriminator(x_ba, z_a_b_fake, num_layers, scope='Discriminator_A', reuse=True)
+                logits_a_real, probs_a_real = joint_discriminator(x_a,
+                                                                  z_a_b,
+                                                                  num_layers + 1,
+                                                                  initial_depth=2*depth,
+                                                                  scope='Discriminator_A')
+                logits_b_real, probs_b_real = discriminator(x_b,
+                                                            num_layers + 1,
+                                                            initial_depth=2*depth,
+                                                            scope='Discriminator_B')
+                logits_b_fake, probs_b_fake = discriminator(x_ab,
+                                                            num_layers + 1,
+                                                            initial_depth=2 * depth,
+                                                            scope='Discriminator_B',
+                                                            reuse=True)
+                logits_a_fake, probs_a_fake = joint_discriminator(x_ba,
+                                                                  z_a_b_fake,
+                                                                  num_layers + 1,
+                                                                  initial_depth=2 * depth,
+                                                                  scope='Discriminator_A',
+                                                                  reuse=True)
 
     if mode == Modes.TRAIN or mode == Modes.EVAL:
         ##########
