@@ -16,6 +16,7 @@ fi
 function train() {
     python splitgan/trainer.py \
         ${GPU_OPTION} \
+        --skip $1 \
         --verbosity DEBUG  \
         --job-dir $JOB_DIR \
         --dataset-dir $DATASET_DIR \
@@ -25,12 +26,12 @@ function train() {
         --num-layers 4 \
         --depth 64 \
         --split-rate 2 \
-        --alpha1 $1 \
-        --alpha2 $2 \
-        --beta1 $3 \
-        --beta2 $4 \
-        --lambda1 $5 \
-        --lambda2 $6
+        --alpha1 $2 \
+        --alpha2 $3 \
+        --beta1 $4 \
+        --beta2 $5 \
+        --lambda1 $6 \
+        --lambda2 $7
 }
 
 function hypertune() {
@@ -41,6 +42,7 @@ function hypertune() {
                     for m in $(seq -w 5.0 4.0 15.0); do #3
                         for n in $(seq -w 5.0 4.0 15.0); do #3
                             train \
+                                true \
                                 ${i} \
                                 ${j} \
                                 ${k} \
@@ -56,6 +58,7 @@ function hypertune() {
 }
 if [ $1 = "train" ]; then
     train \
+        false \
         0.00001 \
         0.00001 \
         0.00015 \
