@@ -195,7 +195,7 @@ if __name__ == '__main__':
                         help='Batch size for training steps')
     parser.add_argument('--eval-batch-size',
                         type=int,
-                        default=5,
+                        default=10,
                         help='Batch size for eval steps')
     parser.add_argument('--alpha1',
                         type=float,
