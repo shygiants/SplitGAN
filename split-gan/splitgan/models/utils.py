@@ -82,6 +82,23 @@ def encoder(inputs, num_layers, kernel_size=3, initial_depth=32, scope=None, reu
     return inputs
 
 
+def downsample(inputs, num_layers, initial_depth, kernel_size=3, scope=None, reuse=None):
+    with tf.variable_scope('Pool', values=[inputs]):
+        for n in range(num_layers):
+            depth = initial_depth * 2 ** (n + 1)
+            with tf.variable_scope('Conv2d_{}_{}'.format(n, depth), values=[inputs]):
+                inputs = tf.layers.conv2d(inputs,
+                                          depth,
+                                          kernel_size,
+                                          strides=(2, 2),
+                                          padding='SAME',
+                                          use_bias=False)
+                inputs = instance_norm(inputs)
+                inputs = tf.nn.relu(inputs)
+
+    return inputs
+
+
 def decoder(inputs, num_layers, kernel_size=3, initial_depth=32, scope=None, reuse=None):
     with tf.variable_scope(scope, 'Decoder', [inputs], reuse=reuse):
         for n in range(num_layers - 1):
@@ -179,19 +196,19 @@ def discriminator(inputs,
             return inputs
 
 
-def joint_discriminator(x, z, num_layers, kernel_size=4, initial_depth=64, scope=None, reuse=None):
+def joint_discriminator(x, z, num_layers, kernel_size=4, initial_depth_x=64, initial_depth_z=64, scope=None, reuse=None):
     with tf.variable_scope(scope, 'JointDiscriminator', [x, z], reuse=reuse):
         x_discr = discriminator(x,
                                 num_layers,
                                 kernel_size=kernel_size,
-                                initial_depth=initial_depth,
+                                initial_depth=initial_depth_x,
                                 use_logit=False,
                                 scope='X_Discriminator')
 
         z_discr = discriminator(z,
                                 2,
                                 kernel_size=1,
-                                initial_depth=initial_depth * 2 ** num_layers,
+                                initial_depth=initial_depth_z,
                                 down_sample=False,
                                 use_logit=False,
                                 scope='Z_Discriminator')
@@ -202,8 +219,9 @@ def joint_discriminator(x, z, num_layers, kernel_size=4, initial_depth=64, scope
         return discriminator(concat,
                              2,
                              kernel_size=1,
-                             initial_depth=initial_depth * 2 ** (num_layers + 2),
+                             initial_depth=initial_depth_x * 2 ** num_layers + initial_depth_z * 2,
                              scope='Joint_Discriminator')
+
 
 def normalize_images(images):
     images -= tf.reduce_min(images)

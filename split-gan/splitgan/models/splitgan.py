@@ -6,7 +6,8 @@ import tensorflow as tf
 from tensorflow.python.estimator.model_fn import ModeKeys as Modes
 from tensorflow.contrib.framework import arg_scope, add_arg_scope
 
-from utils import encoder, decoder, discriminator, normalize_images, run_train_ops_stepwise, transformer, joint_discriminator
+from utils import encoder, decoder, discriminator, \
+    normalize_images, run_train_ops_stepwise, transformer, instance_norm, downsample, joint_discriminator
 
 
 def model_fn(features, labels, mode, params):
@@ -32,6 +33,10 @@ def model_fn(features, labels, mode, params):
     log_depth = int(math.log(latent_depth, 2))
     log_depth_b = log_depth - 1 - split_rate
     depth_b = 2 ** log_depth_b
+    depth_a_b = latent_depth - depth_b
+
+    num_downsample = 2
+    depth_a_b_pooled = depth_a_b * 2 ** num_downsample
 
     with tf.variable_scope('SplitGAN', values=[x_a, x_b]):
         add_arg_scope(tf.layers.conv2d)
@@ -44,10 +49,11 @@ def model_fn(features, labels, mode, params):
 
                     # z is split into c_b, z_a-b
                     c_b, z_a_b = tf.split(z_a,
-                                          num_or_size_splits=[depth_b, latent_depth - depth_b],
+                                          num_or_size_splits=[depth_b, depth_a_b],
                                           axis=3)
 
                     if use_avg_pool:
+                        z_a_b = downsample(z_a_b, num_downsample, depth_a_b)
                         z_a_b = tf.reduce_mean(z_a_b, axis=[1, 2], keep_dims=True)
 
                     outputs_ab = decoder(c_b, num_layers, scope='Decoder_B',
@@ -70,7 +76,7 @@ def model_fn(features, labels, mode, params):
                     ####################
                     # Transformer part #
                     ####################
-                    c_a = transformer(c_a, latent_depth, num_blocks=num_blocks,
+                    c_a = transformer(c_a, depth_b + depth_a_b_pooled, num_blocks=num_blocks,
                                       scope='Transformer_A', reuse=reuse)
 
                     outputs_ba = decoder(c_a, num_layers, initial_depth=depth, scope='Decoder_A')
@@ -108,8 +114,9 @@ def model_fn(features, labels, mode, params):
 
                 logits_a_real, probs_a_real = joint_discriminator(x_a,
                                                                   z_a_b,
-                                                                  num_layers + 1,
-                                                                  initial_depth=2*depth,
+                                                                  num_layers - 1,
+                                                                  initial_depth_x=2*depth,
+                                                                  initial_depth_z=2*depth_a_b_pooled,
                                                                   scope='Discriminator_A')
                 logits_b_real, probs_b_real = discriminator(x_b,
                                                             num_layers + 1,
@@ -122,8 +129,9 @@ def model_fn(features, labels, mode, params):
                                                             reuse=True)
                 logits_a_fake, probs_a_fake = joint_discriminator(x_ba,
                                                                   z_a_b_fake,
-                                                                  num_layers + 1,
-                                                                  initial_depth=2 * depth,
+                                                                  num_layers - 1,
+                                                                  initial_depth_x=2 * depth,
+                                                                  initial_depth_z=2 * depth_a_b_pooled,
                                                                   scope='Discriminator_A',
                                                                   reuse=True)
 
