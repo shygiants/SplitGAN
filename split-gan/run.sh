@@ -24,8 +24,8 @@ function train() {
         --use-joint-discr true \
         --train-batch-size 1 \
         --train-steps 200000 \
-        --num-layers 4 \
-        --depth 64 \
+        --num-layers 3 \
+        --depth 32 \
         --split-rate 2 \
         --alpha1 $2 \
         --alpha2 $3 \
