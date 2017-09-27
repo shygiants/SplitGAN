@@ -3,7 +3,7 @@
 TRAINER_PACKAGE_PATH=splitgan
 MAIN_TRAINER_MODULE=splitgan.trainer
 
-JOB_DIR="/job-dir"
+JOB_DIR="/job-dir/new-arch"
 LOG_DIR="/job-dir"
 DATASET_DIR="/dataset"
 
