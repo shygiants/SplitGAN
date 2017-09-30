@@ -26,6 +26,7 @@ def model_fn(features, labels, mode, params):
     beta2 = params['beta2']
     lambda1 = params['lambda1']
     lambda2 = params['lambda2']
+    gamma = params['gamma']
     use_avg_pool = params['use_avg_pool']
     use_joint_discr = params['use_joint_discr']
 
@@ -71,12 +72,21 @@ def model_fn(features, labels, mode, params):
                         z_a_b = tf.tile(z_a_b, [1, height, height, 1])
 
                     # Concat z_b and z_a-b
-                    c_a = tf.concat([z_b, z_a_b], 3)
+                    z_a_b = tf.layers.conv2d(z_a_b,
+                                     depth_b,
+                                     1,
+                                     strides=(1, 1),
+                                     padding='SAME',
+                                     use_bias=False)
+                    z_a_b = instance_norm(z_a_b)
+                    z_a_b = tf.nn.relu(z_a_b)
+
+                    c_a = z_b + gamma * z_a_b
 
                     ####################
                     # Transformer part #
                     ####################
-                    c_a = transformer(c_a, depth_b + depth_a_b_pooled, num_blocks=num_blocks,
+                    c_a = transformer(c_a, depth_b, num_blocks=num_blocks,
                                       scope='Transformer_A', reuse=reuse)
 
                     outputs_ba = decoder(c_a, num_layers, initial_depth=depth, scope='Decoder_A')

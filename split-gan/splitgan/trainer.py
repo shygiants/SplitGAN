@@ -26,6 +26,7 @@ def run(job_dir,
         beta2,
         lambda1,
         lambda2,
+        gamma,
         weight_decay,
         num_layers,
         depth,
@@ -73,6 +74,7 @@ def run(job_dir,
         'beta2': beta2,
         'lambda1': lambda1,
         'lambda2': lambda2,
+        'gamma': gamma,
         'weight_decay': weight_decay,
         'num_layers': num_layers,
         'depth': depth,
@@ -90,7 +92,8 @@ def run(job_dir,
                            str(beta1),
                            str(beta2),
                            str(lambda1),
-                           str(lambda2))
+                           str(lambda2),
+                           str(gamma))
     if skip and tf.gfile.Exists(job_dir):
         print 'Training is already done. Skip it. {}'.format(job_dir)
         return
@@ -227,6 +230,10 @@ if __name__ == '__main__':
                         type=float,
                         default=10.,
                         help='Weight for BAB cycle loss')
+    parser.add_argument('--gamma',
+                        type=float,
+                        default=.1,
+                        help='Weight for adding latents')
     parser.add_argument('--weight-decay',
                         type=float,
                         default=0.00001,
