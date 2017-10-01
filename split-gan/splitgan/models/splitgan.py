@@ -81,13 +81,13 @@ def model_fn(features, labels, mode, params):
             ##################
             # Generator part #
             ##################
-            x_ab, z_a_b = generator_ab(x_a)
-            x_ba = generator_ba(x_b, z_a_b)
-
-            images_a = [x_a, x_ab]
-            images_b = [x_b, x_ba]
-
             if mode == Modes.TRAIN or mode == Modes.EVAL:
+                x_ab, z_a_b = generator_ab(x_a)
+                x_ba = generator_ba(x_b, z_a_b)
+
+                images_a = [x_a, x_ab]
+                images_b = [x_b, x_ba]
+
                 x_aba = generator_ba(x_ab, z_a_b, reuse=True)
                 x_bab, _ = generator_ab(x_ba, reuse=True)
 
@@ -101,6 +101,15 @@ def model_fn(features, labels, mode, params):
                 logits_b_real, probs_b_real = discriminator(x_b, num_layers + 1, initial_depth=2*depth, scope='Discriminator_B')
                 logits_b_fake, probs_b_fake = discriminator(x_ab, num_layers + 1, initial_depth=2*depth, scope='Discriminator_B', reuse=True)
                 logits_a_fake, probs_a_fake = discriminator(x_ba, num_layers + 1, initial_depth=2*depth, scope='Discriminator_A', reuse=True)
+
+            if mode == Modes.EVAL:
+                x_a_str, x_a_stl = tf.split(x_a, num_or_size_splits=2, axis=0)
+                x_b_str, x_b_stl = tf.split(x_b, num_or_size_splits=2, axis=0)
+
+                _, z_a_b_stl = generator_ab(x_a_stl, reuse=True)
+                x_generated = generator_ba(x_b_str, z_a_b_stl, reuse=True)
+
+                images_generated = [x_b_str, x_a_stl, x_generated]
 
     if mode == Modes.TRAIN or mode == Modes.EVAL:
         ##########
@@ -189,15 +198,21 @@ def model_fn(features, labels, mode, params):
             tf.summary.scalar('lambda2', lambda2)
 
     # Image summaries
-    images_a_concat = tf.concat(
-        axis=2,
-        values=map(normalize_images, images_a))
-    images_b_concat = tf.concat(
-        axis=2,
-        values=map(normalize_images, images_b))
+    if mode == Modes.TRAIN or mode == Modes.EVAL:
+        images_a_concat = tf.concat(
+            axis=2,
+            values=map(normalize_images, images_a))
+        images_b_concat = tf.concat(
+            axis=2,
+            values=map(normalize_images, images_b))
 
-    tf.summary.image('ImagesA', images_a_concat, max_outputs=10)
-    tf.summary.image('ImagesB', images_b_concat, max_outputs=10)
+        tf.summary.image('ImagesA', images_a_concat, max_outputs=10)
+        tf.summary.image('ImagesB', images_b_concat, max_outputs=10)
+    if mode == Modes.EVAL:
+        images_gen_concat = tf.concat(
+            axis=2,
+            values=map(normalize_images, images_generated))
+        tf.summary.image('ImagesGenerated', images_gen_concat, max_outputs=10)
 
     if mode == Modes.TRAIN:
         return tf.estimator.EstimatorSpec(mode, loss=loss, train_op=train_op)
@@ -205,7 +220,8 @@ def model_fn(features, labels, mode, params):
         return tf.estimator.EstimatorSpec(mode, loss=loss)
     if mode == Modes.PREDICT:
         predictions = {
-            'x_ab': x_ab,
-            'x_ba': x_ba
+            'x_b_str': x_b_str,
+            'x_a_stl': x_a_stl,
+            'x_generated': x_generated,
         }
         return tf.estimator.EstimatorSpec(mode, predictions=predictions)

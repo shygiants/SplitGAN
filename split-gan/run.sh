@@ -17,14 +17,15 @@ function train() {
     python splitgan/trainer.py \
         ${GPU_OPTION} \
         --skip $1 \
+        --eval-only false \
         --verbosity DEBUG  \
         --job-dir $JOB_DIR \
         --dataset-dir $DATASET_DIR \
         --paired-dataset edges2shoes \
         --train-batch-size 1 \
         --train-steps 200000 \
-        --num-layers 4 \
-        --depth 64 \
+        --num-layers 3 \
+        --depth 32 \
         --split-rate 2 \
         --alpha1 $2 \
         --alpha2 $3 \

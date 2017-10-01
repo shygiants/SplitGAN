@@ -31,7 +31,8 @@ def run(job_dir,
         num_blocks,
         split_rate,
         gpu,
-        skip):
+        skip,
+        eval_only):
 
     def input_fn(dataset, batch_size):
         dataset = dataset.shuffle(buffer_size=10000)
@@ -112,16 +113,19 @@ def run(job_dir,
 
     eval_steps = 5000
     for _ in range(train_steps/eval_steps):
-        # Run train
-        estimator.train(functools.partial(input_fn,
-                                          dataset=dataset_train,
-                                          batch_size=train_batch_size),
-                        steps=eval_steps)
+        if not eval_only:
+            # Run train
+            estimator.train(functools.partial(input_fn,
+                                              dataset=dataset_train,
+                                              batch_size=train_batch_size),
+                            steps=eval_steps)
         estimator.evaluate(functools.partial(input_fn,
                                              dataset=dataset_valid,
                                              batch_size=eval_batch_size),
                            steps=1,
                            hooks=[tf.contrib.training.SummaryAtEndHook(log_dir=os.path.join(job_dir, 'eval'))])
+        if eval_only:
+            return
 
 
 if __name__ == '__main__':
@@ -253,6 +257,10 @@ if __name__ == '__main__':
                         type=str2bool,
                         default=False,
                         help='Whether to skip if the directory already exists')
+    parser.add_argument('--eval-only',
+                        type=str2bool,
+                        default=False,
+                        help='Run evaluation only')
     parser.add_argument('--verbosity',
                         choices=[
                             'DEBUG',
