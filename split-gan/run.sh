@@ -17,6 +17,7 @@ function train() {
     python splitgan/trainer.py \
         ${GPU_OPTION} \
         --skip $1 \
+        --eval-only false \
         --verbosity DEBUG  \
         --job-dir $JOB_DIR \
         --dataset-dir $DATASET_DIR \
