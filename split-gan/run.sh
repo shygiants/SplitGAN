@@ -3,8 +3,8 @@
 TRAINER_PACKAGE_PATH=splitgan
 MAIN_TRAINER_MODULE=splitgan.trainer
 
-JOB_DIR="/job-dir/new-arch"
-LOG_DIR="/job-dir"
+JOB_DIR="/job-dir/no-avg-pool"
+LOG_DIR="no-avg-pool:/job-dir/no-avg-pool,conv-pool:/job-dir/conv-pool,new-arch:/job-dir/new-arch,joint-conv-pool:/job-dir/joint-conv-pool,joint-conv-pool-gamma:/job-dir/joint-conv-pool-gamma"
 DATASET_DIR="/dataset"
 
 if [ -z "$2" ]; then
