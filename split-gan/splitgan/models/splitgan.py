@@ -139,7 +139,8 @@ def model_fn(features, labels, mode, params):
 
         l_const_a = tf.reduce_mean(tf.losses.absolute_difference(x_a, x_aba))
         l_const_b = tf.reduce_mean(tf.losses.absolute_difference(x_b, x_bab))
-        loss = l_const_a + l_const_b
+
+        loss = tf.reduce_mean(tf.losses.absolute_difference(x_a, x_ba))
 
         l_g_a = l_g_ab_gan + lambda1 * l_const_a
         l_g_b = l_g_ba_gan + lambda2 * l_const_b
