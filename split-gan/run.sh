@@ -4,7 +4,7 @@ TRAINER_PACKAGE_PATH=splitgan
 MAIN_TRAINER_MODULE=splitgan.trainer
 
 JOB_DIR="/job-dir/joint-conv-pool"
-LOG_DIR="conv-pool:/job-dir/conv-pool,new-arch:/job-dir/new-arch,joint-conv-pool:/job-dir/joint-conv-pool"
+LOG_DIR="no-avg-pool:/job-dir/no-avg-pool,conv-pool:/job-dir/conv-pool,new-arch:/job-dir/new-arch,joint-conv-pool:/job-dir/joint-conv-pool,joint-conv-pool-gamma:/job-dir/joint-conv-pool-gamma"
 DATASET_DIR="/dataset"
 
 if [ -z "$2" ]; then
@@ -17,6 +17,7 @@ function train() {
     python splitgan/trainer.py \
         ${GPU_OPTION} \
         --skip $1 \
+        --eval-only false \
         --verbosity DEBUG  \
         --job-dir $JOB_DIR \
         --dataset-dir $DATASET_DIR \
