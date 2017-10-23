@@ -3,7 +3,7 @@
 TRAINER_PACKAGE_PATH=splitgan
 MAIN_TRAINER_MODULE=splitgan.trainer
 
-JOB_DIR="/job-dir/joint-conv-pool-gamma"
+JOB_DIR="/job-dir/joint-conv-pool-gamma/dual"
 LOG_DIR="no-avg-pool:/job-dir/no-avg-pool,conv-pool:/job-dir/conv-pool,new-arch:/job-dir/new-arch,joint-conv-pool:/job-dir/joint-conv-pool,joint-conv-pool-gamma:/job-dir/joint-conv-pool-gamma"
 DATASET_DIR="/dataset"
 
@@ -27,7 +27,7 @@ function train() {
         --train-steps 200000 \
         --num-layers 3 \
         --depth 32 \
-        --split-rate 2 \
+        --split-rate 0 \
         --alpha1 $2 \
         --alpha2 $3 \
         --beta1 $4 \

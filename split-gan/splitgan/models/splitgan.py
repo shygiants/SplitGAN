@@ -46,12 +46,8 @@ def model_fn(features, labels, mode, params):
                        kernel_regularizer=tf.contrib.layers.l2_regularizer(weight_decay)):
             def generator_ab(inputs_a, reuse=None):
                 with tf.variable_scope('Generator_AB', values=[inputs_a], reuse=reuse):
-                    z_a = encoder(inputs_a, num_layers, initial_depth=depth, scope='Encoder_A')
-
-                    # z is split into c_b, z_a-b
-                    c_b, z_a_b = tf.split(z_a,
-                                          num_or_size_splits=[depth_b, depth_a_b],
-                                          axis=3)
+                    c_b = encoder(inputs_a, num_layers, initial_depth=depth/2, scope='Encoder_A_Str')
+                    z_a_b = encoder(inputs_a, num_layers, initial_depth=depth/2, scope='Encoder_A_Stl')
 
                     if use_avg_pool:
                         z_a_b = downsample(z_a_b, num_downsample, depth_a_b)
