@@ -2,10 +2,12 @@
 
 import discogan
 import splitgan
+import cyclegan
 
 models_map = {
     'discogan': discogan.model_fn,
     'splitgan': splitgan.model_fn,
+    'cyclegan': cyclegan.model_fn,
 }
 
 

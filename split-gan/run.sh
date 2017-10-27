@@ -3,8 +3,9 @@
 TRAINER_PACKAGE_PATH=splitgan
 MAIN_TRAINER_MODULE=splitgan.trainer
 
-JOB_DIR="/job-dir/no-avg-pool"
-LOG_DIR="no-avg-pool:/job-dir/no-avg-pool,conv-pool:/job-dir/conv-pool,new-arch:/job-dir/new-arch,joint-conv-pool:/job-dir/joint-conv-pool,joint-conv-pool-gamma:/job-dir/joint-conv-pool-gamma"
+JOB_DIR="/job-dir/cyclegan"
+#LOG_DIR="no-avg-pool:/job-dir/no-avg-pool,conv-pool:/job-dir/conv-pool,new-arch:/job-dir/new-arch,joint-conv-pool:/job-dir/joint-conv-pool,joint-conv-pool-gamma:/job-dir/joint-conv-pool-gamma"
+LOG_DIR="/job-dir/cyclegan"
 DATASET_DIR="/dataset"
 
 if [ -z "$2" ]; then
@@ -22,11 +23,11 @@ function train() {
         --job-dir $JOB_DIR \
         --dataset-dir $DATASET_DIR \
         --paired-dataset edges2shoes \
+        --model-name cyclegan \
         --train-batch-size 1 \
         --train-steps 200000 \
         --num-layers 3 \
         --depth 32 \
-        --split-rate 2 \
         --alpha1 $2 \
         --alpha2 $3 \
         --beta1 $4 \
@@ -60,10 +61,10 @@ function hypertune() {
 if [ $1 = "train" ]; then
     train \
         false \
-        0.00001 \
-        0.00001 \
-        0.00015 \
-        0.00015 \
+        0.0002 \
+        0.0002 \
+        0.0002 \
+        0.0002 \
         10.0 \
         10.0
 elif [ $1 = "hypertune" ]; then
