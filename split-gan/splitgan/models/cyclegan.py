@@ -166,7 +166,7 @@ def model_fn(features, labels, mode, params):
         train_op_g_b, beta2 = get_train_op(beta2, l_g_ba, g_ba_vars)
 
         train_ops = [train_op_d_a, train_op_d_b, train_op_g_a, train_op_g_b]
-        train_op = run_train_ops_stepwise(train_ops, global_step)
+        train_op = tf.group(*train_ops)
 
         with tf.name_scope('hyperparameters'):
             tf.summary.scalar('alpha1', alpha1)
