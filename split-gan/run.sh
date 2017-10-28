@@ -3,7 +3,7 @@
 TRAINER_PACKAGE_PATH=splitgan
 MAIN_TRAINER_MODULE=splitgan.trainer
 
-JOB_DIR="/job-dir/cyclegan"
+JOB_DIR="/job-dir/cyclegan/revised-v2"
 #LOG_DIR="no-avg-pool:/job-dir/no-avg-pool,conv-pool:/job-dir/conv-pool,new-arch:/job-dir/new-arch,joint-conv-pool:/job-dir/joint-conv-pool,joint-conv-pool-gamma:/job-dir/joint-conv-pool-gamma"
 LOG_DIR="/job-dir/cyclegan"
 DATASET_DIR="/dataset"

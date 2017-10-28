@@ -37,8 +37,7 @@ def model_fn(features, labels, mode, params):
                     ####################
                     # Transformer part #
                     ####################
-                    z_a = transformer(z_a, latent_depth, num_blocks=num_blocks,
-                                      scope='Transformer_AB', reuse=reuse)
+                    z_a = transformer(z_a, latent_depth, num_blocks=num_blocks, scope='Transformer_AB')
 
                     outputs_ab = decoder(z_a, num_layers, initial_depth=depth, scope='Decoder_AB')
 
@@ -51,8 +50,7 @@ def model_fn(features, labels, mode, params):
                     ####################
                     # Transformer part #
                     ####################
-                    z_b = transformer(z_b, latent_depth, num_blocks=num_blocks,
-                                      scope='Transformer_BA', reuse=reuse)
+                    z_b = transformer(z_b, latent_depth, num_blocks=num_blocks, scope='Transformer_BA')
 
                     outputs_ba = decoder(z_b, num_layers, initial_depth=depth, scope='Decoder_BA')
 
@@ -99,7 +97,8 @@ def model_fn(features, labels, mode, params):
 
         d_a_vars = filter(search_fn('Discriminator_A'), t_vars)
         d_b_vars = filter(search_fn('Discriminator_B'), t_vars)
-        g_vars = filter(search_fn('Generator'), t_vars)
+        g_ab_vars = filter(search_fn('Generator_AB'), t_vars)
+        g_ba_vars = filter(search_fn('Generator_BA'), t_vars)
 
         # Discriminator losses
         l_d_a_real = tf.reduce_mean(tf.squared_difference(logits_a_real, 1.))
@@ -119,8 +118,10 @@ def model_fn(features, labels, mode, params):
 
         loss = l_const_a + l_const_b
 
-        l_g_a = l_g_ab_gan + lambda1 * l_const_a
-        l_g_b = l_g_ba_gan + lambda2 * l_const_b
+        cyclic_loss = lambda1 * l_const_a + lambda2 * l_const_b
+
+        l_g_ab = l_g_ab_gan + cyclic_loss
+        l_g_ba = l_g_ba_gan + cyclic_loss
 
         with tf.name_scope('losses'):
             tf.summary.scalar('L_D_A_Real', l_d_a_real)
@@ -133,8 +134,8 @@ def model_fn(features, labels, mode, params):
             tf.summary.scalar('L_G_BA_GAN', l_g_ba_gan)
             tf.summary.scalar('L_Const_A', l_const_a)
             tf.summary.scalar('L_Const_B', l_const_b)
-            tf.summary.scalar('L_G_A', l_g_a)
-            tf.summary.scalar('L_G_B', l_g_b)
+            tf.summary.scalar('L_G_AB', l_g_ab)
+            tf.summary.scalar('L_G_BA', l_g_ba)
 
     if mode == Modes.TRAIN:
         def get_train_op(learning_rate, loss, var_list):
@@ -161,8 +162,8 @@ def model_fn(features, labels, mode, params):
 
         train_op_d_a, alpha1 = get_train_op(alpha1, l_d_a, d_a_vars)
         train_op_d_b, alpha2 = get_train_op(alpha2, l_d_b, d_b_vars)
-        train_op_g_a, beta1 = get_train_op(beta1, l_g_a, g_vars)
-        train_op_g_b, beta2 = get_train_op(beta2, l_g_b, g_vars)
+        train_op_g_a, beta1 = get_train_op(beta1, l_g_ab, g_ab_vars)
+        train_op_g_b, beta2 = get_train_op(beta2, l_g_ba, g_ba_vars)
 
         train_ops = [train_op_d_a, train_op_d_b, train_op_g_a, train_op_g_b]
         train_op = run_train_ops_stepwise(train_ops, global_step)
