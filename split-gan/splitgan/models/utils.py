@@ -54,6 +54,17 @@ def resize_deconv(inputs, filters, kernel_size, strides=(1, 1), use_bias=True, s
     return inputs
 
 
+def deconv(inputs, filters, kernel_size, strides=(1, 1), use_bias=True, scope=None, reuse=None):
+    with tf.variable_scope(scope, 'Deconv', [inputs], reuse=reuse):
+        inputs = tf.layers.conv2d_transpose(inputs,
+                                            filters,
+                                            kernel_size,
+                                            strides=strides,
+                                            padding='SAME',
+                                            use_bias=use_bias)
+        return inputs
+
+
 def encoder(inputs, num_layers, kernel_size=3, initial_depth=32, scope=None, reuse=None):
     with tf.variable_scope(scope, 'Encoder', [inputs], reuse=reuse):
         with tf.variable_scope('Conv2d_0_{}'.format(initial_depth), values=[inputs]):
@@ -87,11 +98,11 @@ def decoder(inputs, num_layers, kernel_size=3, initial_depth=32, scope=None, reu
         for n in range(num_layers - 1):
             depth = initial_depth * 2**(num_layers - 2 - n)
             with tf.variable_scope('Deconv2d_{}_{}'.format(n, depth), values=[inputs]):
-                inputs = resize_deconv(inputs,
-                                       depth,
-                                       kernel_size,
-                                       strides=(2, 2),
-                                       use_bias=False)
+                inputs = deconv(inputs,
+                                depth,
+                                kernel_size,
+                                strides=(2, 2),
+                                use_bias=False)
                 inputs = instance_norm(inputs)
                 inputs = tf.nn.relu(inputs)
 
