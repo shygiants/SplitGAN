@@ -4,7 +4,8 @@ import tensorflow as tf
 from tensorflow.python.estimator.model_fn import ModeKeys as Modes
 from tensorflow.contrib.framework import arg_scope, add_arg_scope
 
-from utils import encoder, decoder, transformer, discriminator, normalize_images, run_train_ops_stepwise
+from utils import encoder, decoder, transformer, discriminator, \
+    normalize_images, run_train_ops_stepwise, image_pool
 
 
 def model_fn(features, labels, mode, params):
@@ -12,6 +13,7 @@ def model_fn(features, labels, mode, params):
     x_b = features['x_b']
 
     # Hyperparameters
+    pool_size = params['pool_size']
     weight_decay = params['weight_decay']
     num_layers = params['num_layers']
     depth = params['depth']
@@ -70,16 +72,28 @@ def model_fn(features, labels, mode, params):
             images_a.append(x_aba)
             images_b.append(x_bab)
 
+            if mode == Modes.TRAIN:
+                # TODO: History of generated images
+                fake_b, pool_b = image_pool(x_ab, pool_size, scope='image_pool_B')
+                fake_a, pool_a = image_pool(x_ba, pool_size, scope='image_pool_A')
+            else:
+                fake_b = x_ab
+                fake_a = x_ba
+
             ######################
             # Discriminator part #
             ######################
-            logits_a_real, probs_a_real = discriminator(x_a, num_layers + 1, initial_depth=2 * depth,
+            logits_a_real, probs_a_real = discriminator(x_a, num_layers + 1, initial_depth=depth,
                                                         scope='Discriminator_A')
-            logits_b_real, probs_b_real = discriminator(x_b, num_layers + 1, initial_depth=2 * depth,
+            logits_b_real, probs_b_real = discriminator(x_b, num_layers + 1, initial_depth=depth,
                                                         scope='Discriminator_B')
-            logits_b_fake, probs_b_fake = discriminator(x_ab, num_layers + 1, initial_depth=2 * depth,
+            logits_b_fake_d, probs_b_fake_d = discriminator(fake_b, num_layers + 1, initial_depth=depth,
+                                                            scope='Discriminator_B', reuse=True)
+            logits_a_fake_d, probs_a_fake_d = discriminator(fake_a, num_layers + 1, initial_depth=depth,
+                                                            scope='Discriminator_A', reuse=True)
+            logits_b_fake, probs_b_fake = discriminator(x_ab, num_layers + 1, initial_depth=depth,
                                                         scope='Discriminator_B', reuse=True)
-            logits_a_fake, probs_a_fake = discriminator(x_ba, num_layers + 1, initial_depth=2 * depth,
+            logits_a_fake, probs_a_fake = discriminator(x_ba, num_layers + 1, initial_depth=depth,
                                                         scope='Discriminator_A', reuse=True)
 
     if mode == Modes.TRAIN or mode == Modes.EVAL:
@@ -98,9 +112,9 @@ def model_fn(features, labels, mode, params):
 
         # Discriminator losses
         l_d_a_real = tf.reduce_mean(tf.squared_difference(logits_a_real, 1.))
-        l_d_a_fake = tf.reduce_mean(tf.square(logits_a_fake))
+        l_d_a_fake = tf.reduce_mean(tf.square(logits_a_fake_d))
         l_d_b_real = tf.reduce_mean(tf.squared_difference(logits_b_real, 1.))
-        l_d_b_fake = tf.reduce_mean(tf.square(logits_b_fake))
+        l_d_b_fake = tf.reduce_mean(tf.square(logits_b_fake_d))
 
         l_d_a = (l_d_a_real + l_d_a_fake) * .5
         l_d_b = (l_d_b_real + l_d_b_fake) * .5
@@ -135,8 +149,8 @@ def model_fn(features, labels, mode, params):
 
     if mode == Modes.TRAIN:
         def get_train_op(learning_rate, loss, var_list):
-            start_decay_step = 100000
-            decay_steps = 100000
+            start_decay_step = 1000000
+            decay_steps = 1000000
             starter_learning_rate = learning_rate
             end_learning_rate = 0.0
 
@@ -181,8 +195,14 @@ def model_fn(features, labels, mode, params):
             axis=2,
             values=map(normalize_images, images_b))
 
-        tf.summary.image('ImagesA', images_a_concat, max_outputs=10)
-        tf.summary.image('ImagesB', images_b_concat, max_outputs=10)
+        tf.summary.image('ImagesA', images_a_concat, max_outputs=20)
+        tf.summary.image('ImagesB', images_b_concat, max_outputs=20)
+
+        if mode == Modes.TRAIN:
+            pool_a = normalize_images(pool_a)
+            pool_b = normalize_images(pool_b)
+            tf.summary.image('PoolA', pool_a, max_outputs=5)
+            tf.summary.image('PoolB', pool_b, max_outputs=5)
 
     if mode == Modes.TRAIN:
         return tf.estimator.EstimatorSpec(mode, loss=loss, train_op=train_op)

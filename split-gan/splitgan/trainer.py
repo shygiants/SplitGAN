@@ -18,6 +18,7 @@ def run(job_dir,
         dataset_dir,
         train_batch_size,
         eval_batch_size,
+        pool_size,
         train_steps,
         alpha1,
         alpha2,
@@ -32,7 +33,8 @@ def run(job_dir,
         split_rate,
         gpu,
         skip,
-        eval_only):
+        eval_only,
+        random_seed):
 
     def input_fn(dataset, batch_size):
         dataset = dataset.shuffle(buffer_size=10000)
@@ -67,6 +69,7 @@ def run(job_dir,
 
     # Hyperparameters
     params = {
+        'pool_size': pool_size,
         'alpha1': alpha1,
         'alpha2': alpha2,
         'beta1': beta1,
@@ -89,7 +92,8 @@ def run(job_dir,
                            str(beta1),
                            str(beta2),
                            str(lambda1),
-                           str(lambda2))
+                           str(lambda2),
+                           'rs{}'.format(random_seed))
     if skip and tf.gfile.Exists(job_dir):
         print 'Training is already done. Skip it. {}'.format(job_dir)
         return
@@ -108,7 +112,8 @@ def run(job_dir,
         model_fn,
         model_dir=job_dir,
         config=tf.estimator.RunConfig().replace(session_config=session_config,
-                                                save_summary_steps=1000),
+                                                save_summary_steps=1000,
+                                                tf_random_seed=random_seed),
         params=params)
 
     eval_steps = 5000
@@ -199,8 +204,12 @@ if __name__ == '__main__':
                         help='Batch size for training steps')
     parser.add_argument('--eval-batch-size',
                         type=int,
-                        default=10,
+                        default=20,
                         help='Batch size for eval steps')
+    parser.add_argument('--pool-size',
+                        type=int,
+                        default=50,
+                        help='Pool size for history of generated images')
     parser.add_argument('--alpha1',
                         type=float,
                         default=0.0002,
@@ -261,6 +270,10 @@ if __name__ == '__main__':
                         type=str2bool,
                         default=False,
                         help='Run evaluation only')
+    parser.add_argument('--random-seed',
+                        type=int,
+                        default=1,
+                        help='Random seed')
     parser.add_argument('--verbosity',
                         choices=[
                             'DEBUG',

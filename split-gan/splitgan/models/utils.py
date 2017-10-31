@@ -98,11 +98,11 @@ def decoder(inputs, num_layers, kernel_size=3, initial_depth=32, scope=None, reu
         for n in range(num_layers - 1):
             depth = initial_depth * 2**(num_layers - 2 - n)
             with tf.variable_scope('Deconv2d_{}_{}'.format(n, depth), values=[inputs]):
-                inputs = deconv(inputs,
-                                depth,
-                                kernel_size,
-                                strides=(2, 2),
-                                use_bias=False)
+                inputs = resize_deconv(inputs,
+                                       depth,
+                                       kernel_size,
+                                       strides=(2, 2),
+                                       use_bias=False)
                 inputs = instance_norm(inputs)
                 inputs = tf.nn.relu(inputs)
 
@@ -162,7 +162,7 @@ def discriminator(inputs, num_layers, kernel_size=4, initial_depth=64, scope=Non
                 inputs = tf.layers.conv2d(inputs,
                                           depth,
                                           kernel_size,
-                                          strides=(2, 2),
+                                          strides=(2, 2) if n != num_layers - 1 else (1, 1),
                                           padding='SAME',
                                           use_bias=False)
                 if n != 0:
@@ -196,3 +196,41 @@ def run_train_ops_stepwise(train_ops, global_step):
     train_op = tf.case(pred_fn_pairs, lambda: tf.no_op(), exclusive=True)
 
     return train_op
+
+
+def image_pool(inputs, pool_size, scope=None):
+    images_shape = [pool_size, 256, 256, 3]
+    with tf.variable_scope(scope, 'image_pool', [inputs]):
+        # TODO: Remove hard coded image shape
+        images = tf.get_variable('images', images_shape,
+                                 initializer=tf.zeros_initializer(dtype=tf.float32),
+                                 trainable=False)
+        num_images = tf.get_variable('num_images', (), dtype=tf.int32,
+                                     initializer=tf.zeros_initializer(dtype=tf.int32),
+                                     trainable=False)
+        push = tf.less(num_images, pool_size, name='push')
+
+        def push_n_identity():
+            push_images = tf.scatter_update(images, [num_images], [tf.squeeze(inputs, axis=0)], name='push_images')
+            with tf.control_dependencies([push_images]):
+                increment = tf.assign_add(num_images, 1, name='increment')
+                with tf.control_dependencies([increment]):
+                    return tf.identity(inputs)
+
+        def sample():
+            r = tf.random_uniform((), minval=0., maxval=1., dtype=tf.float32)
+            identity = tf.greater(r, 0.5, name='identity')
+
+            def pop_n_push():
+                rand_idx = tf.random_uniform((), minval=0, maxval=pool_size, dtype=tf.int32)
+                to_return = images[rand_idx]
+                push_images = tf.scatter_update(images, [rand_idx], [tf.squeeze(inputs, axis=0)], name='push_images')
+                with tf.control_dependencies([push_images]):
+                    return tf.identity(to_return)
+
+            return tf.cond(identity, lambda: inputs, pop_n_push)
+
+        return tf.reshape(tf.cond(push,
+                                  true_fn=push_n_identity,
+                                  false_fn=sample),
+                          [1, 256, 256, 3]), images

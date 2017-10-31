@@ -3,7 +3,7 @@
 TRAINER_PACKAGE_PATH=splitgan
 MAIN_TRAINER_MODULE=splitgan.trainer
 
-JOB_DIR="/job-dir/cyclegan/revised-v5"
+JOB_DIR="/job-dir/cyclegan/revised-v11"
 #LOG_DIR="no-avg-pool:/job-dir/no-avg-pool,conv-pool:/job-dir/conv-pool,new-arch:/job-dir/new-arch,joint-conv-pool:/job-dir/joint-conv-pool,joint-conv-pool-gamma:/job-dir/joint-conv-pool-gamma"
 LOG_DIR="/job-dir/cyclegan"
 DATASET_DIR="/dataset"
@@ -25,9 +25,9 @@ function train() {
         --paired-dataset edges2shoes \
         --model-name cyclegan \
         --train-batch-size 1 \
-        --train-steps 200000 \
+        --train-steps 2000000 \
         --num-layers 3 \
-        --depth 32 \
+        --depth 64 \
         --alpha1 $2 \
         --alpha2 $3 \
         --beta1 $4 \
