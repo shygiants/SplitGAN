@@ -74,7 +74,7 @@ def encoder(inputs, num_layers, kernel_size=3, initial_depth=32, scope=None, reu
                                       7,
                                       strides=(1, 1),
                                       padding='VALID',
-                                      use_bias=False)
+                                      use_bias=True)
             inputs = instance_norm(inputs)
             inputs = tf.nn.relu(inputs)
 
@@ -86,7 +86,7 @@ def encoder(inputs, num_layers, kernel_size=3, initial_depth=32, scope=None, reu
                                           kernel_size,
                                           strides=(2, 2),
                                           padding='SAME',
-                                          use_bias=False)
+                                          use_bias=True)
                 inputs = instance_norm(inputs)
                 inputs = tf.nn.relu(inputs)
 
@@ -102,7 +102,7 @@ def decoder(inputs, num_layers, kernel_size=3, initial_depth=32, scope=None, reu
                                        depth,
                                        kernel_size,
                                        strides=(2, 2),
-                                       use_bias=False)
+                                       use_bias=True)
                 inputs = instance_norm(inputs)
                 inputs = tf.nn.relu(inputs)
 
@@ -112,7 +112,7 @@ def decoder(inputs, num_layers, kernel_size=3, initial_depth=32, scope=None, reu
                                   7,
                                   strides=(1, 1),
                                   padding='VALID',
-                                  use_bias=False,
+                                  use_bias=True,
                                   name='Deconv2d_{}_{}'.format(num_layers - 1, 3))
         inputs = tf.nn.tanh(inputs)
 
@@ -129,6 +129,7 @@ def resnet_block(inputs, num_features, scope=None, reuse=None):
                                   3,
                                   strides=(1, 1),
                                   padding='VALID',
+                                  use_bias=True,
                                   name='Conv2d_0_{}'.format(num_features))
         inputs = instance_norm(inputs)
         inputs = tf.nn.relu(inputs)
@@ -140,6 +141,7 @@ def resnet_block(inputs, num_features, scope=None, reuse=None):
                                   3,
                                   strides=(1, 1),
                                   padding='VALID',
+                                  use_bias=True,
                                   name='Conv2d_1_{}'.format(num_features))
         inputs = instance_norm(inputs)
 
@@ -164,7 +166,7 @@ def discriminator(inputs, num_layers, kernel_size=4, initial_depth=64, scope=Non
                                           kernel_size,
                                           strides=(2, 2) if n != num_layers - 1 else (1, 1),
                                           padding='SAME',
-                                          use_bias=False)
+                                          use_bias=True)
                 if n != 0:
                     inputs = instance_norm(inputs)
                 inputs = lrelu(inputs)

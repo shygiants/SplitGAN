@@ -95,6 +95,13 @@ def model_fn(features, labels, mode, params):
                                                         scope='Discriminator_B', reuse=True)
             logits_a_fake, probs_a_fake = discriminator(x_ba, num_layers + 1, initial_depth=depth,
                                                         scope='Discriminator_A', reuse=True)
+            with tf.name_scope('logits'):
+                tf.summary.histogram('logits_a_real', logits_a_real)
+                tf.summary.histogram('logits_b_real', logits_b_real)
+                tf.summary.histogram('logits_a_fake', logits_a_fake)
+                tf.summary.histogram('logits_b_fake', logits_b_fake)
+                tf.summary.histogram('logits_a_fake_d', logits_a_fake_d)
+                tf.summary.histogram('logits_b_fake_d', logits_b_fake_d)
 
     if mode == Modes.TRAIN or mode == Modes.EVAL:
         ##########
@@ -107,8 +114,7 @@ def model_fn(features, labels, mode, params):
 
         d_a_vars = filter(search_fn('Discriminator_A'), t_vars)
         d_b_vars = filter(search_fn('Discriminator_B'), t_vars)
-        g_ab_vars = filter(search_fn('Generator_AB'), t_vars)
-        g_ba_vars = filter(search_fn('Generator_BA'), t_vars)
+        g_vars = filter(search_fn('Generator'), t_vars)
 
         # Discriminator losses
         l_d_a_real = tf.reduce_mean(tf.squared_difference(logits_a_real, 1.))
@@ -132,6 +138,7 @@ def model_fn(features, labels, mode, params):
 
         l_g_ab = l_g_ab_gan + cyclic_loss
         l_g_ba = l_g_ba_gan + cyclic_loss
+        l_g = l_g_ab_gan + l_g_ba_gan + cyclic_loss
 
         with tf.name_scope('losses'):
             tf.summary.scalar('L_D_A_Real', l_d_a_real)
@@ -149,8 +156,8 @@ def model_fn(features, labels, mode, params):
 
     if mode == Modes.TRAIN:
         def get_train_op(learning_rate, loss, var_list):
-            start_decay_step = 1000000
-            decay_steps = 1000000
+            start_decay_step = 100000
+            decay_steps = 100000
             starter_learning_rate = learning_rate
             end_learning_rate = 0.0
 
@@ -172,10 +179,9 @@ def model_fn(features, labels, mode, params):
 
         train_op_d_a, alpha1 = get_train_op(alpha1, l_d_a, d_a_vars)
         train_op_d_b, alpha2 = get_train_op(alpha2, l_d_b, d_b_vars)
-        train_op_g_a, beta1 = get_train_op(beta1, l_g_ab, g_ab_vars)
-        train_op_g_b, beta2 = get_train_op(beta2, l_g_ba, g_ba_vars)
+        train_op_g, beta1 = get_train_op(beta1, l_g, g_vars)
 
-        train_ops = [train_op_d_a, train_op_d_b, train_op_g_a, train_op_g_b]
+        train_ops = [train_op_d_a, train_op_d_b, train_op_g]
         train_op = tf.group(*train_ops)
 
         with tf.name_scope('hyperparameters'):
