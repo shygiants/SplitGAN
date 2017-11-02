@@ -77,7 +77,6 @@ def model_fn(features, labels, mode, params):
                 images_b.append(x_bab)
 
                 if mode == Modes.TRAIN:
-                    # TODO: History of generated images
                     fake_b, pool_b = image_pool(x_ab, pool_size, scope='image_pool_B')
                     fake_a, pool_a = image_pool(x_ba, pool_size, scope='image_pool_A')
                 else:

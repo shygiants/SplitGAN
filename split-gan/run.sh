@@ -3,9 +3,9 @@
 TRAINER_PACKAGE_PATH=splitgan
 MAIN_TRAINER_MODULE=splitgan.trainer
 
-JOB_DIR="/job-dir/cyclegan/revised-v15"
+JOB_DIR="/job-dir/splitgan/revised-v1"
 #LOG_DIR="no-avg-pool:/job-dir/no-avg-pool,conv-pool:/job-dir/conv-pool,new-arch:/job-dir/new-arch,joint-conv-pool:/job-dir/joint-conv-pool,joint-conv-pool-gamma:/job-dir/joint-conv-pool-gamma"
-LOG_DIR="/job-dir/cyclegan"
+LOG_DIR="/job-dir/splitgan"
 DATASET_DIR="/dataset"
 
 if [ -z "$2" ]; then
@@ -24,7 +24,7 @@ function train() {
         --job-dir $JOB_DIR \
         --dataset-dir $DATASET_DIR \
         --paired-dataset edges2shoes \
-        --model-name cyclegan \
+        --model-name splitgan \
         --train-batch-size 1 \
         --train-steps 2000000 \
         --num-layers 3 \
