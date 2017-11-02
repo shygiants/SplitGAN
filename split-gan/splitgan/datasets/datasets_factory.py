@@ -3,11 +3,15 @@
 import mnist
 import mnist_m
 import edges2shoes
+import horse
+import zebra
 
 datasets_map = {
     'mnist': mnist,
     'mnist_m': mnist_m,
     'edges2shoes': edges2shoes,
+    'horse': horse,
+    'zebra': zebra,
 }
 
 
