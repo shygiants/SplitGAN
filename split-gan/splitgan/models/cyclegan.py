@@ -28,80 +28,84 @@ def model_fn(features, labels, mode, params):
     latent_depth = depth * 2 ** (num_layers - 1)
 
     with tf.variable_scope('CycleGAN', values=[x_a, x_b]):
-        def generator_ab(inputs_a, reuse=None):
-            with tf.variable_scope('Generator_AB', values=[inputs_a], reuse=reuse):
-                z_a = encoder(inputs_a, num_layers, initial_depth=depth, scope='Encoder_AB')
+        add_arg_scope(tf.layers.conv2d)
+        with arg_scope([tf.layers.conv2d],
+                       kernel_initializer=tf.glorot_normal_initializer(),
+                       bias_initializer=tf.glorot_uniform_initializer()):
+            def generator_ab(inputs_a, reuse=None):
+                with tf.variable_scope('Generator_AB', values=[inputs_a], reuse=reuse):
+                    z_a = encoder(inputs_a, num_layers, initial_depth=depth, scope='Encoder_AB')
 
-                ####################
-                # Transformer part #
-                ####################
-                z_a = transformer(z_a, latent_depth, num_blocks=num_blocks, scope='Transformer_AB')
+                    ####################
+                    # Transformer part #
+                    ####################
+                    z_a = transformer(z_a, latent_depth, num_blocks=num_blocks, scope='Transformer_AB')
 
-                outputs_ab = decoder(z_a, num_layers, initial_depth=depth, scope='Decoder_AB')
+                    outputs_ab = decoder(z_a, num_layers, initial_depth=depth, scope='Decoder_AB')
 
-                return outputs_ab
+                    return outputs_ab
 
-        def generator_ba(inputs_b, reuse=None):
-            with tf.variable_scope('Generator_BA', values=[inputs_b], reuse=reuse):
-                z_b = encoder(inputs_b, num_layers, initial_depth=depth, scope='Encoder_BA')
+            def generator_ba(inputs_b, reuse=None):
+                with tf.variable_scope('Generator_BA', values=[inputs_b], reuse=reuse):
+                    z_b = encoder(inputs_b, num_layers, initial_depth=depth, scope='Encoder_BA')
 
-                ####################
-                # Transformer part #
-                ####################
-                z_b = transformer(z_b, latent_depth, num_blocks=num_blocks, scope='Transformer_BA')
+                    ####################
+                    # Transformer part #
+                    ####################
+                    z_b = transformer(z_b, latent_depth, num_blocks=num_blocks, scope='Transformer_BA')
 
-                outputs_ba = decoder(z_b, num_layers, initial_depth=depth, scope='Decoder_BA')
+                    outputs_ba = decoder(z_b, num_layers, initial_depth=depth, scope='Decoder_BA')
 
-                return outputs_ba
+                    return outputs_ba
 
-        global_step = tf.train.get_or_create_global_step()
+            global_step = tf.train.get_or_create_global_step()
 
-        ##################
-        # Generator part #
-        ##################
-        if mode == Modes.TRAIN or mode == Modes.EVAL:
-            x_ab = generator_ab(x_a)
-            x_ba = generator_ba(x_b)
+            ##################
+            # Generator part #
+            ##################
+            if mode == Modes.TRAIN or mode == Modes.EVAL:
+                x_ab = generator_ab(x_a)
+                x_ba = generator_ba(x_b)
 
-            images_a = [x_a, x_ab]
-            images_b = [x_b, x_ba]
+                images_a = [x_a, x_ab]
+                images_b = [x_b, x_ba]
 
-            x_aba = generator_ba(x_ab, reuse=True)
-            x_bab = generator_ab(x_ba, reuse=True)
+                x_aba = generator_ba(x_ab, reuse=True)
+                x_bab = generator_ab(x_ba, reuse=True)
 
-            images_a.append(x_aba)
-            images_b.append(x_bab)
+                images_a.append(x_aba)
+                images_b.append(x_bab)
 
-            if mode == Modes.TRAIN:
-                # TODO: History of generated images
-                fake_b, pool_b = image_pool(x_ab, pool_size, scope='image_pool_B')
-                fake_a, pool_a = image_pool(x_ba, pool_size, scope='image_pool_A')
-            else:
-                fake_b = x_ab
-                fake_a = x_ba
+                if mode == Modes.TRAIN:
+                    # TODO: History of generated images
+                    fake_b, pool_b = image_pool(x_ab, pool_size, scope='image_pool_B')
+                    fake_a, pool_a = image_pool(x_ba, pool_size, scope='image_pool_A')
+                else:
+                    fake_b = x_ab
+                    fake_a = x_ba
 
-            ######################
-            # Discriminator part #
-            ######################
-            logits_a_real, probs_a_real = discriminator(x_a, num_layers + 1, initial_depth=depth,
-                                                        scope='Discriminator_A')
-            logits_b_real, probs_b_real = discriminator(x_b, num_layers + 1, initial_depth=depth,
-                                                        scope='Discriminator_B')
-            logits_b_fake_d, probs_b_fake_d = discriminator(fake_b, num_layers + 1, initial_depth=depth,
+                ######################
+                # Discriminator part #
+                ######################
+                logits_a_real, probs_a_real = discriminator(x_a, num_layers + 1, initial_depth=depth,
+                                                            scope='Discriminator_A')
+                logits_b_real, probs_b_real = discriminator(x_b, num_layers + 1, initial_depth=depth,
+                                                            scope='Discriminator_B')
+                logits_b_fake_d, probs_b_fake_d = discriminator(fake_b, num_layers + 1, initial_depth=depth,
+                                                                scope='Discriminator_B', reuse=True)
+                logits_a_fake_d, probs_a_fake_d = discriminator(fake_a, num_layers + 1, initial_depth=depth,
+                                                                scope='Discriminator_A', reuse=True)
+                logits_b_fake, probs_b_fake = discriminator(x_ab, num_layers + 1, initial_depth=depth,
                                                             scope='Discriminator_B', reuse=True)
-            logits_a_fake_d, probs_a_fake_d = discriminator(fake_a, num_layers + 1, initial_depth=depth,
+                logits_a_fake, probs_a_fake = discriminator(x_ba, num_layers + 1, initial_depth=depth,
                                                             scope='Discriminator_A', reuse=True)
-            logits_b_fake, probs_b_fake = discriminator(x_ab, num_layers + 1, initial_depth=depth,
-                                                        scope='Discriminator_B', reuse=True)
-            logits_a_fake, probs_a_fake = discriminator(x_ba, num_layers + 1, initial_depth=depth,
-                                                        scope='Discriminator_A', reuse=True)
-            with tf.name_scope('logits'):
-                tf.summary.histogram('logits_a_real', logits_a_real)
-                tf.summary.histogram('logits_b_real', logits_b_real)
-                tf.summary.histogram('logits_a_fake', logits_a_fake)
-                tf.summary.histogram('logits_b_fake', logits_b_fake)
-                tf.summary.histogram('logits_a_fake_d', logits_a_fake_d)
-                tf.summary.histogram('logits_b_fake_d', logits_b_fake_d)
+                with tf.name_scope('logits'):
+                    tf.summary.histogram('logits_a_real', logits_a_real)
+                    tf.summary.histogram('logits_b_real', logits_b_real)
+                    tf.summary.histogram('logits_a_fake', logits_a_fake)
+                    tf.summary.histogram('logits_b_fake', logits_b_fake)
+                    tf.summary.histogram('logits_a_fake_d', logits_a_fake_d)
+                    tf.summary.histogram('logits_b_fake_d', logits_b_fake_d)
 
     if mode == Modes.TRAIN or mode == Modes.EVAL:
         ##########
@@ -207,8 +211,8 @@ def model_fn(features, labels, mode, params):
         if mode == Modes.TRAIN:
             pool_a = normalize_images(pool_a)
             pool_b = normalize_images(pool_b)
-            tf.summary.image('PoolA', pool_a, max_outputs=5)
-            tf.summary.image('PoolB', pool_b, max_outputs=5)
+            tf.summary.image('PoolA', pool_a, max_outputs=pool_size)
+            tf.summary.image('PoolB', pool_b, max_outputs=pool_size)
 
     if mode == Modes.TRAIN:
         return tf.estimator.EstimatorSpec(mode, loss=loss, train_op=train_op)
