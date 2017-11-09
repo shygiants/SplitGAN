@@ -7,7 +7,8 @@ from tensorflow.python.estimator.model_fn import ModeKeys as Modes
 from tensorflow.contrib.framework import arg_scope, add_arg_scope
 
 from utils import encoder, decoder, discriminator, \
-    normalize_images, run_train_ops_stepwise, transformer, image_pool
+    normalize_images, run_train_ops_stepwise, transformer, image_pool, \
+    instance_norm, downsample, joint_discriminator, gated_split
 
 
 def model_fn(features, labels, mode, params):
@@ -20,6 +21,7 @@ def model_fn(features, labels, mode, params):
     num_layers = params['num_layers']
     depth = params['depth']
     num_blocks = params['num_blocks']
+    # TODO: Remove split_rate
     split_rate = params['split_rate']
     alpha1 = params['alpha1']
     alpha2 = params['alpha2']
@@ -27,12 +29,16 @@ def model_fn(features, labels, mode, params):
     beta2 = params['beta2']
     lambda1 = params['lambda1']
     lambda2 = params['lambda2']
-    use_avg_pool = params['use_avg_pool']
+    # use_joint_discr = params['use_joint_discr']
 
     latent_depth = depth * 2 ** (num_layers - 1)
     log_depth = int(math.log(latent_depth, 2))
     log_depth_b = log_depth - 1 - split_rate
     depth_b = 2 ** log_depth_b
+    depth_a_b = latent_depth - depth_b
+
+    num_downsample = 2
+    depth_a_b_pooled = depth_a_b * 2 ** num_downsample
 
     with tf.variable_scope('SplitGAN', values=[x_a, x_b]):
         add_arg_scope(tf.layers.conv2d)
@@ -44,31 +50,28 @@ def model_fn(features, labels, mode, params):
                     z_a = encoder(inputs_a, num_layers, initial_depth=depth, scope='Encoder_A')
 
                     # z is split into c_b, z_a-b
-                    c_b, z_a_b = tf.split(z_a,
-                                          num_or_size_splits=[depth_b, latent_depth - depth_b],
-                                          axis=3)
+                    # TODO: Gated split
+                    c_b, z_a_b = gated_split(z_a)
 
                     ####################
                     # Transformer part #
                     ####################
                     c_b = transformer(c_b, latent_depth, num_blocks=num_blocks, scope='Transformer_B')
 
-                    if use_avg_pool:
-                        z_a_b = tf.reduce_mean(z_a_b, axis=[1, 2], keep_dims=True)
+                    z_a_b = downsample(z_a_b, num_downsample, latent_depth)
+                    z_a_b = tf.reduce_mean(z_a_b, axis=[1, 2], keep_dims=True)
 
                     outputs_ab = decoder(c_b, num_layers, scope='Decoder_B',
-                                         initial_depth=depth / 2 ** (1 + split_rate))
+                                         initial_depth=latent_depth)
 
                 return outputs_ab, z_a_b
 
             def generator_ba(inputs_b, z_a_b, reuse=None):
                 with tf.variable_scope('Generator_BA', values=[inputs_b], reuse=reuse):
-                    z_b = encoder(inputs_b, num_layers, scope='Encoder_B',
-                                  initial_depth=depth / 2 ** (1 + split_rate))
+                    z_b = encoder(inputs_b, num_layers, scope='Encoder_B', initial_depth=depth/2)
 
-                    if use_avg_pool:
-                        height = tf.shape(z_b)[1]
-                        z_a_b = tf.tile(z_a_b, [1, height, height, 1])
+                    height = tf.shape(z_b)[1]
+                    z_a_b = tf.tile(z_a_b, [1, height, height, 1])
 
                     # Concat z_b and z_a-b
                     c_a = tf.concat([z_b, z_a_b], 3)
@@ -76,7 +79,7 @@ def model_fn(features, labels, mode, params):
                     ####################
                     # Transformer part #
                     ####################
-                    c_a = transformer(c_a, latent_depth, num_blocks=num_blocks,
+                    c_a = transformer(c_a, c_a.get_shape()[3], num_blocks=num_blocks,
                                       scope='Transformer_A')
 
                     outputs_ba = decoder(c_a, num_layers, initial_depth=depth, scope='Decoder_A')
@@ -96,7 +99,7 @@ def model_fn(features, labels, mode, params):
                 images_b = [x_b, x_ba]
 
                 x_aba = generator_ba(x_ab, z_a_b, reuse=True)
-                x_bab, _ = generator_ab(x_ba, reuse=True)
+                x_bab, z_a_b_fake = generator_ab(x_ba, reuse=True)
 
                 images_a.append(x_aba)
                 images_b.append(x_bab)

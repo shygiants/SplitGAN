@@ -38,6 +38,20 @@ def leaky_relu_fn(negative_slope):
     return leaky_relu
 
 
+def gated_split(inputs, kernel_size=3, scope=None, reuse=None):
+    with tf.variable_scope(scope, 'Gated_Split', [inputs], reuse=reuse):
+        depth = inputs.get_shape()[3]
+        T = tf.layers.conv2d(inputs,
+                             depth,
+                             kernel_size,
+                             strides=(1, 1),
+                             padding='SAME',
+                             use_bias=True)
+        T = tf.nn.sigmoid(T)
+        tf.summary.histogram('T', T)
+        return inputs * T, inputs * (1. - T)
+
+
 def resize_deconv(inputs, filters, kernel_size, strides=(1, 1), use_bias=True, scope=None, reuse=None):
     with tf.variable_scope(scope, 'Resize_Deconv', [inputs], reuse=reuse):
         shape = tf.shape(inputs)
@@ -83,6 +97,24 @@ def encoder(inputs, num_layers, kernel_size=3, initial_depth=32, scope=None, reu
             with tf.variable_scope('Conv2d_{}_{}'.format(n, depth), values=[inputs]):
                 inputs = tf.layers.conv2d(inputs,
                                           depth,
+                                          kernel_size,
+                                          strides=(2, 2),
+                                          padding='SAME',
+                                          use_bias=True)
+                inputs = instance_norm(inputs)
+                inputs = tf.nn.relu(inputs)
+
+    return inputs
+
+
+def downsample(inputs, num_layers, initial_depth, kernel_size=3, scope=None, reuse=None):
+    with tf.variable_scope(scope, 'Downsample', [inputs], reuse=reuse):
+        for n in range(num_layers):
+            depth = initial_depth * 2 ** (n + 1)
+            depth_used = min(depth, 64 * 8)
+            with tf.variable_scope('Conv2d_{}_{}'.format(n, depth_used), values=[inputs]):
+                inputs = tf.layers.conv2d(inputs,
+                                          depth_used,
                                           kernel_size,
                                           strides=(2, 2),
                                           padding='SAME',
@@ -155,7 +187,14 @@ def transformer(inputs, num_features, num_blocks=6, scope=None, reuse=None):
     return inputs
 
 
-def discriminator(inputs, num_layers, kernel_size=4, initial_depth=64, scope=None, reuse=None):
+def discriminator(inputs,
+                  num_layers,
+                  kernel_size=4,
+                  initial_depth=64,
+                  down_sample=True,
+                  use_logit=True,
+                  scope=None,
+                  reuse=None):
     with tf.variable_scope(scope, 'Discriminator', [inputs], reuse=reuse):
         lrelu = leaky_relu_fn(0.2)
         for n in range(num_layers):
@@ -170,17 +209,46 @@ def discriminator(inputs, num_layers, kernel_size=4, initial_depth=64, scope=Non
                 if n != 0:
                     inputs = instance_norm(inputs)
                 inputs = lrelu(inputs)
+        if use_logit:
+            logits = tf.layers.conv2d(inputs,
+                                      1,
+                                      kernel_size,
+                                      strides=(1, 1),
+                                      padding='SAME',
+                                      use_bias=True,
+                                      name='Logits')
+            probs = tf.nn.sigmoid(logits, name='Probs')
 
-        logits = tf.layers.conv2d(inputs,
-                                  1,
-                                  kernel_size,
-                                  strides=(1, 1),
-                                  padding='SAME',
-                                  use_bias=True,
-                                  name='Logits')
-        probs = tf.nn.sigmoid(logits, name='Probs')
+            return logits, probs
+        else:
+            return inputs
 
-    return logits, probs
+
+def joint_discriminator(x, z, num_layers, kernel_size=4, initial_depth_x=64, initial_depth_z=64, scope=None, reuse=None):
+    with tf.variable_scope(scope, 'JointDiscriminator', [x, z], reuse=reuse):
+        x_discr = discriminator(x,
+                                num_layers,
+                                kernel_size=kernel_size,
+                                initial_depth=initial_depth_x,
+                                use_logit=False,
+                                scope='X_Discriminator')
+
+        z_discr = discriminator(z,
+                                2,
+                                kernel_size=1,
+                                initial_depth=initial_depth_z,
+                                down_sample=False,
+                                use_logit=False,
+                                scope='Z_Discriminator')
+        height = tf.shape(x_discr)[1]
+        z_discr = tf.tile(z_discr, [1, height, height, 1])
+        concat = tf.concat([x_discr, z_discr], 3)
+
+        return discriminator(concat,
+                             2,
+                             kernel_size=1,
+                             initial_depth=initial_depth_x * 2 ** num_layers + initial_depth_z * 2,
+                             scope='Joint_Discriminator')
 
 
 def normalize_images(images):

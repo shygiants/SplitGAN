@@ -11,7 +11,7 @@ from models import models_factory
 
 def run(job_dir,
         model_name,
-        use_avg_pool,
+        use_joint_discr,
         paired_dataset,
         domain_a,
         domain_b,
@@ -81,7 +81,7 @@ def run(job_dir,
         'depth': depth,
         'num_blocks': num_blocks,
         'split_rate': split_rate,
-        'use_avg_pool': use_avg_pool,
+        'use_joint_discr': use_joint_discr,
     }
     job_dir = os.path.join(job_dir,
                            str(depth),
@@ -167,10 +167,10 @@ if __name__ == '__main__':
                         help='The name of the model to use.',
                         choices=models_factory.models_map.keys(),
                         default='splitgan')
-    parser.add_argument('--use-avg-pool',
+    parser.add_argument('--use-joint-discr',
                         type=str2bool,
                         default=True,
-                        help='Whether to use average pooling')
+                        help='Whether to use joint discriminator')
 
     ############
     # Datasets #
