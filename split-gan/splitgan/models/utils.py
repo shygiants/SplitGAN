@@ -107,7 +107,7 @@ def encoder(inputs, num_layers, kernel_size=3, initial_depth=32, scope=None, reu
     return inputs
 
 
-def downsample(inputs, num_layers, initial_depth, kernel_size=3, scope=None, reuse=None):
+def downsample(inputs, num_layers, initial_depth, kernel_size=3, activation=tf.nn.relu, scope=None, reuse=None):
     with tf.variable_scope(scope, 'Downsample', [inputs], reuse=reuse):
         for n in range(num_layers):
             depth = initial_depth * 2 ** (n + 1)
@@ -120,7 +120,7 @@ def downsample(inputs, num_layers, initial_depth, kernel_size=3, scope=None, reu
                                           padding='SAME',
                                           use_bias=True)
                 inputs = instance_norm(inputs)
-                inputs = tf.nn.relu(inputs)
+                inputs = activation(inputs)
 
     return inputs
 
@@ -193,6 +193,7 @@ def discriminator(inputs,
                   initial_depth=64,
                   down_sample=True,
                   use_logit=True,
+                  use_info=False,
                   scope=None,
                   reuse=None):
     with tf.variable_scope(scope, 'Discriminator', [inputs], reuse=reuse):
@@ -209,6 +210,12 @@ def discriminator(inputs,
                 if n != 0:
                     inputs = instance_norm(inputs)
                 inputs = lrelu(inputs)
+
+        if use_info:
+            info = inputs
+            info = downsample(info, 2, info.get_shape()[3], activation=lrelu)
+            info = tf.reduce_mean(info, axis=[1, 2], keep_dims=True)
+
         if use_logit:
             logits = tf.layers.conv2d(inputs,
                                       1,
@@ -218,10 +225,15 @@ def discriminator(inputs,
                                       use_bias=True,
                                       name='Logits')
             probs = tf.nn.sigmoid(logits, name='Probs')
-
-            return logits, probs
+            if use_info:
+                return logits, probs, info
+            else:
+                return logits, probs
         else:
-            return inputs
+            if use_info:
+                return inputs, info
+            else:
+                return inputs
 
 
 def joint_discriminator(x, z, num_layers, kernel_size=4, initial_depth_x=64, initial_depth_z=64, scope=None, reuse=None):

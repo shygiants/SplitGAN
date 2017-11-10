@@ -29,6 +29,8 @@ def model_fn(features, labels, mode, params):
     beta2 = params['beta2']
     lambda1 = params['lambda1']
     lambda2 = params['lambda2']
+    gamma1 = params['gamma1']
+    gamma2 = params['gamma2']
     # use_joint_discr = params['use_joint_discr']
 
     latent_depth = depth * 2 ** (num_layers - 1)
@@ -114,18 +116,19 @@ def model_fn(features, labels, mode, params):
                 ######################
                 # Discriminator part #
                 ######################
-                logits_a_real, probs_a_real = discriminator(x_a, num_layers + 1, initial_depth=depth,
-                                                            scope='Discriminator_A')
+                logits_a_real, probs_a_real, _ = discriminator(x_a, num_layers + 1, initial_depth=depth,
+                                                               scope='Discriminator_A', use_info=True)
                 logits_b_real, probs_b_real = discriminator(x_b, num_layers + 1, initial_depth=depth,
                                                             scope='Discriminator_B')
                 logits_b_fake_d, probs_b_fake_d = discriminator(fake_b, num_layers + 1, initial_depth=depth,
                                                                 scope='Discriminator_B', reuse=True)
-                logits_a_fake_d, probs_a_fake_d = discriminator(fake_a, num_layers + 1, initial_depth=depth,
-                                                                scope='Discriminator_A', reuse=True)
+                logits_a_fake_d, probs_a_fake_d, _ = discriminator(fake_a, num_layers + 1, initial_depth=depth,
+                                                                   scope='Discriminator_A', use_info=True, reuse=True)
                 logits_b_fake, probs_b_fake = discriminator(x_ab, num_layers + 1, initial_depth=depth,
                                                             scope='Discriminator_B', reuse=True)
-                logits_a_fake, probs_a_fake = discriminator(x_ba, num_layers + 1, initial_depth=depth,
-                                                            scope='Discriminator_A', reuse=True)
+                logits_a_fake, probs_a_fake, info_a_fake = discriminator(x_ba, num_layers + 1, initial_depth=depth,
+                                                                         use_info=True, scope='Discriminator_A',
+                                                                         reuse=True)
 
                 with tf.name_scope('logits'):
                     tf.summary.histogram('logits_a_real', logits_a_real)
@@ -157,13 +160,16 @@ def model_fn(features, labels, mode, params):
         d_b_vars = filter(search_fn('Discriminator_B'), t_vars)
         g_vars = filter(search_fn('Generator'), t_vars)
 
+        # Info losses
+        l_info = tf.reduce_mean(tf.squared_difference(z_a_b, info_a_fake))
+
         # Discriminator losses
         l_d_a_real = tf.reduce_mean(tf.squared_difference(logits_a_real, 1.))
         l_d_a_fake = tf.reduce_mean(tf.square(logits_a_fake_d))
         l_d_b_real = tf.reduce_mean(tf.squared_difference(logits_b_real, 1.))
         l_d_b_fake = tf.reduce_mean(tf.square(logits_b_fake_d))
 
-        l_d_a = (l_d_a_real + l_d_a_fake) * .5
+        l_d_a = (l_d_a_real + l_d_a_fake) * .5 + gamma1 * l_info
         l_d_b = (l_d_b_real + l_d_b_fake) * .5
 
         # Generator losses
@@ -179,7 +185,7 @@ def model_fn(features, labels, mode, params):
 
         l_g_ab = l_g_ab_gan + cyclic_loss
         l_g_ba = l_g_ba_gan + cyclic_loss
-        l_g = l_g_ab_gan + l_g_ba_gan + cyclic_loss
+        l_g = l_g_ab_gan + l_g_ba_gan + cyclic_loss + gamma2 * l_info
 
         with tf.name_scope('losses'):
             tf.summary.scalar('L_D_A_Real', l_d_a_real)
@@ -194,6 +200,7 @@ def model_fn(features, labels, mode, params):
             tf.summary.scalar('L_Const_B', l_const_b)
             tf.summary.scalar('L_G_AB', l_g_ab)
             tf.summary.scalar('L_G_BA', l_g_ba)
+            tf.summary.scalar('L_Info', l_info)
 
     if mode == Modes.TRAIN:
         def get_train_op(learning_rate, loss, var_list):

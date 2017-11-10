@@ -3,9 +3,10 @@
 TRAINER_PACKAGE_PATH=splitgan
 MAIN_TRAINER_MODULE=splitgan.trainer
 
-JOB_DIR="/job-dir/splitgan/revised-v1"
+JOB_DIR="/job-dir/splitgan/revised-v3"
+#JOB_DIR="/job-dir/cyclegan/horse-color"
 #LOG_DIR="no-avg-pool:/job-dir/no-avg-pool,conv-pool:/job-dir/conv-pool,new-arch:/job-dir/new-arch,joint-conv-pool:/job-dir/joint-conv-pool,joint-conv-pool-gamma:/job-dir/joint-conv-pool-gamma"
-LOG_DIR="/job-dir/splitgan"
+LOG_DIR="splitgan:/job-dir/splitgan,cyclegan:/job-dir/cyclegan"
 DATASET_DIR="/dataset"
 
 if [ -z "$2" ]; then
@@ -26,7 +27,8 @@ function train() {
         --paired-dataset edges2shoes \
         --model-name splitgan \
         --train-batch-size 1 \
-        --train-steps 2000000 \
+        --eval-batch-size 10 \
+        --train-steps 200000 \
         --num-layers 3 \
         --depth 64 \
         --alpha1 $2 \
@@ -63,7 +65,7 @@ if [ $1 = "train" ]; then
     train \
         false \
         0.0002 \
-        0.0002 \
+        0.00002 \
         0.0002 \
         0.0002 \
         10.0 \
