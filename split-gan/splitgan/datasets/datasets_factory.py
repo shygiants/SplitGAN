@@ -4,6 +4,7 @@ import mnist
 import mnist_m
 import edges2shoes
 import horse
+import horse_gray
 import zebra
 
 datasets_map = {
@@ -11,6 +12,7 @@ datasets_map = {
     'mnist_m': mnist_m,
     'edges2shoes': edges2shoes,
     'horse': horse,
+    'horse_gray': horse_gray,
     'zebra': zebra,
 }
 

@@ -68,7 +68,7 @@ def model_fn(features, labels, mode, params):
 
             def generator_ba(inputs_b, z_a_b, reuse=None):
                 with tf.variable_scope('Generator_BA', values=[inputs_b], reuse=reuse):
-                    z_b = encoder(inputs_b, num_layers, scope='Encoder_B', initial_depth=depth/2)
+                    z_b = encoder(inputs_b, num_layers, scope='Encoder_B', initial_depth=depth)
 
                     height = tf.shape(z_b)[1]
                     z_a_b = tf.tile(z_a_b, [1, height, height, 1])
