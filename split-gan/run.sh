@@ -74,7 +74,11 @@ elif [ $1 = "hypertune" ]; then
     hypertune
 elif [ $1 = "tensorboard" ]; then
     tensorboard --logdir=${LOG_DIR} --host=0.0.0.0
+elif [ $1 = "convert" ]; then
+    python splitgan/datasets/convert_fashion_synth.py \
+        ${GPU_OPTION} \
+        --dataset-dir $DATASET_DIR
 else
-    echo "Usage: run.sh [train|hypertune|tensorboard]"
+    echo "Usage: run.sh [train|hypertune|tensorboard|convert]"
     exit 1
 fi

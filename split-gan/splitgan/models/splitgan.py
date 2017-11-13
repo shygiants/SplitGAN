@@ -16,6 +16,7 @@ def model_fn(features, labels, mode, params):
     x_b = features['x_b']
 
     # Hyperparameters
+    image_size = params['image_size']
     pool_size = params['pool_size']
     weight_decay = params['weight_decay']
     num_layers = params['num_layers']
@@ -53,7 +54,7 @@ def model_fn(features, labels, mode, params):
 
                     # z is split into c_b, z_a-b
                     # TODO: Gated split
-                    c_b, z_a_b = gated_split(z_a)
+                    z_a_b, c_b = gated_split(z_a)
 
                     ####################
                     # Transformer part #
@@ -107,8 +108,8 @@ def model_fn(features, labels, mode, params):
                 images_b.append(x_bab)
 
                 if mode == Modes.TRAIN:
-                    fake_b, pool_b = image_pool(x_ab, pool_size, scope='image_pool_B')
-                    fake_a, pool_a = image_pool(x_ba, pool_size, scope='image_pool_A')
+                    fake_b, pool_b = image_pool(x_ab, pool_size, image_size, scope='image_pool_B')
+                    fake_a, pool_a = image_pool(x_ba, pool_size, image_size, scope='image_pool_A')
                 else:
                     fake_b = x_ab
                     fake_a = x_ba

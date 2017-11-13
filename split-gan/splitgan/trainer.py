@@ -51,6 +51,11 @@ def run(job_dir,
     # Define datasets
     print paired_dataset
 
+    if paired_dataset is not None:
+        image_size = datasets_factory.get_image_size(paired_dataset)
+    else:
+        image_size = datasets_factory.get_image_size(domain_a)
+
     def get_dataset(split_name):
         if paired_dataset is not None:
             dataset = datasets_factory.get_dataset(paired_dataset, split_name, dataset_dir)
@@ -71,6 +76,7 @@ def run(job_dir,
 
     # Hyperparameters
     params = {
+        'image_size': image_size,
         'pool_size': pool_size,
         'alpha1': alpha1,
         'alpha2': alpha2,

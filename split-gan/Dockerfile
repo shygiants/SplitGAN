@@ -1,4 +1,4 @@
-FROM tensorflow/tensorflow:1.3.0-gpu
+FROM tensorflow/tensorflow:1.4.0-gpu
 
 MAINTAINER Sanghoon Yoon <shygiants@gmail.com>
 

@@ -280,8 +280,8 @@ def run_train_ops_stepwise(train_ops, global_step):
     return train_op
 
 
-def image_pool(inputs, pool_size, scope=None):
-    images_shape = [pool_size, 256, 256, 3]
+def image_pool(inputs, pool_size, image_size, scope=None):
+    images_shape = [pool_size, image_size, image_size, 3]
     with tf.variable_scope(scope, 'image_pool', [inputs]):
         # TODO: Remove hard coded image shape
         images = tf.get_variable('images', images_shape,
@@ -315,4 +315,4 @@ def image_pool(inputs, pool_size, scope=None):
         return tf.reshape(tf.cond(push,
                                   true_fn=push_n_identity,
                                   false_fn=sample),
-                          [1, 256, 256, 3]), images
+                          [1, image_size, image_size, 3]), images

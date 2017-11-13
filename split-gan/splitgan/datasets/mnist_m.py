@@ -8,6 +8,8 @@ from utils import get_parse_fn
 
 _FILE_PATTERN = 'mnist_m_%s.tfrecord'
 
+image_size = 32
+
 
 def _preprocess(images):
     images = tf.image.convert_image_dtype(images, tf.float32)
@@ -23,6 +25,6 @@ def dataset_fn(split_name, dataset_dir, file_pattern=None):
     filename = os.path.join(dataset_dir, file_pattern % split_name)
 
     dataset = tf.contrib.data.TFRecordDataset(filename)
-    dataset = dataset.map(get_parse_fn([32, 32, 3], 3, preprocess=_preprocess))
+    dataset = dataset.map(get_parse_fn([image_size, image_size, 3], 3, preprocess=_preprocess))
 
     return dataset
