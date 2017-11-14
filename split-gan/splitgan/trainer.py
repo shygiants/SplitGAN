@@ -65,7 +65,7 @@ def run(job_dir,
             dataset_a = datasets_factory.get_dataset(domain_a, split_name, dataset_dir)
             dataset_b = datasets_factory.get_dataset(domain_b, split_name, dataset_dir)
 
-            dataset = tf.contrib.data.Dataset.zip((dataset_a, dataset_b))
+            dataset = tf.data.Dataset.zip((dataset_a, dataset_b))
             dataset = dataset.map(
                 lambda a, b: ({'x_a': a[0]['image'], 'x_b': b[0]['image']}, {'label_a': a[1], 'label_b': b[1]}))
 

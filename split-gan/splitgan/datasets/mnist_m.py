@@ -24,7 +24,7 @@ def dataset_fn(split_name, dataset_dir, file_pattern=None):
         file_pattern = _FILE_PATTERN
     filename = os.path.join(dataset_dir, file_pattern % split_name)
 
-    dataset = tf.contrib.data.TFRecordDataset(filename)
+    dataset = tf.data.TFRecordDataset(filename)
     dataset = dataset.map(get_parse_fn([image_size, image_size, 3], 3, preprocess=_preprocess))
 
     return dataset

@@ -28,7 +28,7 @@ def dataset_fn(split_name, dataset_dir, file_pattern=None):
     if not tf.gfile.Exists(filename) and split_name == 'valid':
         filename = os.path.join(dataset_dir, file_pattern % 'test')
 
-    dataset = tf.contrib.data.TFRecordDataset(filename)
+    dataset = tf.data.TFRecordDataset(filename)
     dataset = dataset.map(get_parse_fn([image_size, image_size, 3],
                                        3,
                                        preprocess=_preprocess,
