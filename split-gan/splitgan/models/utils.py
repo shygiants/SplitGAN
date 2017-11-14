@@ -1,29 +1,7 @@
 """ Utils for models """
 
 import tensorflow as tf
-
-
-def _weights(name, shape, mean=0.0, stddev=0.02):
-    return tf.get_variable(name, shape,
-                           initializer=tf.random_normal_initializer(
-                               mean=mean, stddev=stddev, dtype=tf.float32))
-
-
-def _biases(name, shape, constant=0.0):
-    return tf.get_variable(name, shape,
-                           initializer=tf.constant_initializer(constant))
-
-
-def instance_norm(inputs, scope=None):
-    with tf.variable_scope(scope, 'instance_norm', [inputs]):
-        depth = inputs.get_shape()[3]
-        scale = _weights('scale', [depth], mean=1.0)
-        offset = _biases('offset', [depth])
-        mean, variance = tf.nn.moments(inputs, axes=[1, 2], keep_dims=True)
-        epsilon = 1e-5
-        inv = tf.rsqrt(variance + epsilon)
-        normalized = (inputs - mean) * inv
-    return scale * normalized + offset
+import operator
 
 
 def reflection_pad(inputs, padding):
@@ -32,21 +10,21 @@ def reflection_pad(inputs, padding):
     return inputs
 
 
-def leaky_relu_fn(negative_slope):
-    def leaky_relu(x):
-        return tf.maximum(negative_slope * x, x, name='lrelu')
-    return leaky_relu
-
-
-def gated_split(inputs, kernel_size=3, scope=None, reuse=None):
+def gated_split(inputs, kernel_size=3, dense=False, scope=None, reuse=None):
     with tf.variable_scope(scope, 'Gated_Split', [inputs], reuse=reuse):
-        depth = inputs.get_shape()[3]
-        T = tf.layers.conv2d(inputs,
-                             depth,
-                             kernel_size,
-                             strides=(1, 1),
-                             padding='SAME',
-                             use_bias=True)
+        if dense:
+            depth = inputs.get_shape()[1]
+            T = tf.layers.dense(inputs,
+                                depth,
+                                use_bias=True)
+        else:
+            depth = inputs.get_shape()[3]
+            T = tf.layers.conv2d(inputs,
+                                 depth,
+                                 kernel_size,
+                                 strides=(1, 1),
+                                 padding='SAME',
+                                 use_bias=True)
         T = tf.nn.sigmoid(T)
         tf.summary.histogram('T', T)
         return inputs * T, inputs * (1. - T)
@@ -79,7 +57,7 @@ def deconv(inputs, filters, kernel_size, strides=(1, 1), use_bias=True, scope=No
         return inputs
 
 
-def encoder(inputs, num_layers, kernel_size=3, initial_depth=32, scope=None, reuse=None):
+def encoder(inputs, num_layers, kernel_size=3, initial_depth=32, dense_dim=None, scope=None, reuse=None):
     with tf.variable_scope(scope, 'Encoder', [inputs], reuse=reuse):
         with tf.variable_scope('Conv2d_0_{}'.format(initial_depth), values=[inputs]):
             inputs = reflection_pad(inputs, 3)
@@ -89,19 +67,28 @@ def encoder(inputs, num_layers, kernel_size=3, initial_depth=32, scope=None, reu
                                       strides=(1, 1),
                                       padding='VALID',
                                       use_bias=True)
-            inputs = instance_norm(inputs)
+            inputs = tf.contrib.layers.instance_norm(inputs)
             inputs = tf.nn.relu(inputs)
 
         for n in range(1, num_layers):
             depth = initial_depth * 2 ** n
-            with tf.variable_scope('Conv2d_{}_{}'.format(n, depth), values=[inputs]):
+            depth_used = min(depth, 64 * 8)
+            with tf.variable_scope('Conv2d_{}_{}'.format(n, depth_used), values=[inputs]):
                 inputs = tf.layers.conv2d(inputs,
-                                          depth,
+                                          depth_used,
                                           kernel_size,
                                           strides=(2, 2),
                                           padding='SAME',
                                           use_bias=True)
-                inputs = instance_norm(inputs)
+                inputs = tf.contrib.layers.instance_norm(inputs)
+                inputs = tf.nn.relu(inputs)
+
+        if dense_dim is not None:
+            with tf.variable_scope('Dense', values=[inputs]):
+                # inputs = tf.layers.flatten(inputs)
+                # TODO: Remove hard coded shape
+                inputs = tf.reshape(inputs, [-1, 4*4*512])
+                inputs = tf.layers.dense(inputs, dense_dim, use_bias=True)
                 inputs = tf.nn.relu(inputs)
 
     return inputs
@@ -119,23 +106,31 @@ def downsample(inputs, num_layers, initial_depth, kernel_size=3, activation=tf.n
                                           strides=(2, 2),
                                           padding='SAME',
                                           use_bias=True)
-                inputs = instance_norm(inputs)
+                inputs = tf.contrib.layers.instance_norm(inputs)
                 inputs = activation(inputs)
 
     return inputs
 
 
-def decoder(inputs, num_layers, kernel_size=3, initial_depth=32, scope=None, reuse=None):
+def decoder(inputs, num_layers, kernel_size=3, initial_depth=32, dense_dim=None, reshape=None, scope=None, reuse=None):
     with tf.variable_scope(scope, 'Decoder', [inputs], reuse=reuse):
+        if dense_dim is not None:
+            with tf.variable_scope('Dense', values=[inputs]):
+                flatten_reshape = reduce(operator.mul, reshape, 1)
+                inputs = tf.layers.dense(inputs, flatten_reshape, use_bias=True)
+                inputs = tf.nn.relu(inputs)
+                inputs = tf.reshape(inputs, [-1] + reshape)
+
         for n in range(num_layers - 1):
             depth = initial_depth * 2**(num_layers - 2 - n)
-            with tf.variable_scope('Deconv2d_{}_{}'.format(n, depth), values=[inputs]):
+            depth_used = min(depth, 64 * 8)
+            with tf.variable_scope('Deconv2d_{}_{}'.format(n, depth_used), values=[inputs]):
                 inputs = resize_deconv(inputs,
-                                       depth,
+                                       depth_used,
                                        kernel_size,
                                        strides=(2, 2),
                                        use_bias=True)
-                inputs = instance_norm(inputs)
+                inputs = tf.contrib.layers.instance_norm(inputs)
                 inputs = tf.nn.relu(inputs)
 
         inputs = reflection_pad(inputs, 3)
@@ -163,7 +158,7 @@ def resnet_block(inputs, num_features, scope=None, reuse=None):
                                   padding='VALID',
                                   use_bias=True,
                                   name='Conv2d_0_{}'.format(num_features))
-        inputs = instance_norm(inputs)
+        inputs = tf.contrib.layers.instance_norm(inputs)
         inputs = tf.nn.relu(inputs)
 
         # Layer 2
@@ -175,7 +170,7 @@ def resnet_block(inputs, num_features, scope=None, reuse=None):
                                   padding='VALID',
                                   use_bias=True,
                                   name='Conv2d_1_{}'.format(num_features))
-        inputs = instance_norm(inputs)
+        inputs = tf.contrib.layers.instance_norm(inputs)
 
     return inputs + shortcut
 
@@ -194,27 +189,35 @@ def discriminator(inputs,
                   down_sample=True,
                   use_logit=True,
                   use_info=False,
+                  dense_dim=None,
                   scope=None,
                   reuse=None):
     with tf.variable_scope(scope, 'Discriminator', [inputs], reuse=reuse):
-        lrelu = leaky_relu_fn(0.2)
         for n in range(num_layers):
             depth = initial_depth * 2 ** n
-            with tf.variable_scope('Conv2d_{}_{}'.format(n, depth), values=[inputs]):
+            depth_used = min(depth, 64 * 8)
+            with tf.variable_scope('Conv2d_{}_{}'.format(n, depth_used), values=[inputs]):
                 inputs = tf.layers.conv2d(inputs,
-                                          depth,
+                                          depth_used,
                                           kernel_size,
                                           strides=(2, 2) if n != num_layers - 1 else (1, 1),
                                           padding='SAME',
                                           use_bias=True)
                 if n != 0:
-                    inputs = instance_norm(inputs)
-                inputs = lrelu(inputs)
+                    inputs = tf.contrib.layers.instance_norm(inputs)
+                inputs = tf.nn.leaky_relu(inputs)
 
         if use_info:
-            info = inputs
-            info = downsample(info, 2, info.get_shape()[3], activation=lrelu)
-            info = tf.reduce_mean(info, axis=[1, 2], keep_dims=True)
+            if dense_dim is not None:
+                # info = tf.layers.flatten(inputs)
+                # TODO: Remove hard coded shape
+                info = tf.reshape(inputs, [-1, 2 * 2 * 512])
+                info = tf.layers.dense(info, dense_dim, use_bias=True)
+                inputs = tf.nn.leaky_relu(inputs)
+            else:
+                info = inputs
+                info = downsample(info, 2, info.get_shape()[3], activation=tf.nn.leaky_relu)
+                info = tf.reduce_mean(info, axis=[1, 2], keep_dims=True)
 
         if use_logit:
             logits = tf.layers.conv2d(inputs,
@@ -315,4 +318,4 @@ def image_pool(inputs, pool_size, image_size, scope=None):
         return tf.reshape(tf.cond(push,
                                   true_fn=push_n_identity,
                                   false_fn=sample),
-                          [1, image_size, image_size, 3]), images
+                          [-1, image_size, image_size, 3]), images

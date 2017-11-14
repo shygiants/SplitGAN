@@ -3,16 +3,21 @@
 import os
 
 import tensorflow as tf
+from tensorflow.python.ops.image_ops_impl import ResizeMethod
 
 from utils import get_parse_fn
 
 _FILE_PATTERN = 'edges2shoes_%s.tfrecord'
 
-image_size = 256
+# image_size = 256
+image_size = 64
 
 
 def _preprocess(images):
     images = tf.image.convert_image_dtype(images, tf.float32)
+
+    images = tf.image.resize_images(images, [64, 64], method=ResizeMethod.AREA)
+
     images -= 0.5
     images *= 2
 

@@ -8,7 +8,7 @@ from tensorflow.contrib.framework import arg_scope, add_arg_scope
 
 from utils import encoder, decoder, discriminator, \
     normalize_images, run_train_ops_stepwise, transformer, image_pool, \
-    instance_norm, downsample, joint_discriminator, gated_split
+    downsample, joint_discriminator, gated_split
 
 
 def model_fn(features, labels, mode, params):
@@ -21,9 +21,8 @@ def model_fn(features, labels, mode, params):
     weight_decay = params['weight_decay']
     num_layers = params['num_layers']
     depth = params['depth']
+    dense_dim = params['dense_dim']
     num_blocks = params['num_blocks']
-    # TODO: Remove split_rate
-    split_rate = params['split_rate']
     alpha1 = params['alpha1']
     alpha2 = params['alpha2']
     beta1 = params['beta1']
@@ -34,58 +33,55 @@ def model_fn(features, labels, mode, params):
     gamma2 = params['gamma2']
     # use_joint_discr = params['use_joint_discr']
 
-    latent_depth = depth * 2 ** (num_layers - 1)
-    log_depth = int(math.log(latent_depth, 2))
-    log_depth_b = log_depth - 1 - split_rate
-    depth_b = 2 ** log_depth_b
-    depth_a_b = latent_depth - depth_b
+    latent_depth = min(depth * 2 ** (num_layers - 1), 64 * 8)
+    reshape = [image_size / 2 ** (num_layers - 1)] * 2 + [latent_depth]
 
     num_downsample = 2
-    depth_a_b_pooled = depth_a_b * 2 ** num_downsample
 
     with tf.variable_scope('SplitGAN', values=[x_a, x_b]):
         add_arg_scope(tf.layers.conv2d)
-        with arg_scope([tf.layers.conv2d],
+        add_arg_scope(tf.layers.dense)
+        with arg_scope([tf.layers.conv2d, tf.layers.dense],
                        kernel_initializer=tf.glorot_normal_initializer(),
                        bias_initializer=tf.glorot_uniform_initializer()):
             def generator_ab(inputs_a, reuse=None):
                 with tf.variable_scope('Generator_AB', values=[inputs_a], reuse=reuse):
-                    z_a = encoder(inputs_a, num_layers, initial_depth=depth, scope='Encoder_A')
+                    z_a = encoder(inputs_a, num_layers, initial_depth=depth, dense_dim=dense_dim, scope='Encoder_A')
 
                     # z is split into c_b, z_a-b
-                    # TODO: Gated split
-                    z_a_b, c_b = gated_split(z_a)
+                    z_a_b, c_b = gated_split(z_a, dense=True)
 
                     ####################
                     # Transformer part #
                     ####################
-                    c_b = transformer(c_b, latent_depth, num_blocks=num_blocks, scope='Transformer_B')
+                    # c_b = transformer(c_b, latent_depth, num_blocks=num_blocks, scope='Transformer_B')
 
-                    z_a_b = downsample(z_a_b, num_downsample, latent_depth)
-                    z_a_b = tf.reduce_mean(z_a_b, axis=[1, 2], keep_dims=True)
+                    # z_a_b = downsample(z_a_b, num_downsample, latent_depth)
+                    # z_a_b = tf.reduce_mean(z_a_b, axis=[1, 2], keep_dims=True)
 
                     outputs_ab = decoder(c_b, num_layers, scope='Decoder_B',
-                                         initial_depth=latent_depth)
+                                         initial_depth=latent_depth, dense_dim=dense_dim, reshape=reshape)
 
                 return outputs_ab, z_a_b
 
             def generator_ba(inputs_b, z_a_b, reuse=None):
                 with tf.variable_scope('Generator_BA', values=[inputs_b], reuse=reuse):
-                    z_b = encoder(inputs_b, num_layers, scope='Encoder_B', initial_depth=depth)
+                    z_b = encoder(inputs_b, num_layers, initial_depth=depth, dense_dim=dense_dim, scope='Encoder_B')
 
-                    height = tf.shape(z_b)[1]
-                    z_a_b = tf.tile(z_a_b, [1, height, height, 1])
+                    # height = tf.shape(z_b)[1]
+                    # z_a_b = tf.tile(z_a_b, [1, height, height, 1])
 
                     # Concat z_b and z_a-b
-                    c_a = tf.concat([z_b, z_a_b], 3)
+                    c_a = tf.concat([z_b, z_a_b], 1)
 
                     ####################
                     # Transformer part #
                     ####################
-                    c_a = transformer(c_a, c_a.get_shape()[3], num_blocks=num_blocks,
-                                      scope='Transformer_A')
+                    # c_a = transformer(c_a, c_a.get_shape()[3], num_blocks=num_blocks,
+                    #                   scope='Transformer_A')
 
-                    outputs_ba = decoder(c_a, num_layers, initial_depth=depth, scope='Decoder_A')
+                    outputs_ba = decoder(c_a, num_layers, initial_depth=depth, dense_dim=dense_dim*2, reshape=reshape,
+                                         scope='Decoder_A')
 
                 return outputs_ba
 
@@ -118,18 +114,20 @@ def model_fn(features, labels, mode, params):
                 # Discriminator part #
                 ######################
                 logits_a_real, probs_a_real, _ = discriminator(x_a, num_layers + 1, initial_depth=depth,
-                                                               scope='Discriminator_A', use_info=True)
+                                                               scope='Discriminator_A', use_info=True,
+                                                               dense_dim=dense_dim)
                 logits_b_real, probs_b_real = discriminator(x_b, num_layers + 1, initial_depth=depth,
                                                             scope='Discriminator_B')
                 logits_b_fake_d, probs_b_fake_d = discriminator(fake_b, num_layers + 1, initial_depth=depth,
                                                                 scope='Discriminator_B', reuse=True)
                 logits_a_fake_d, probs_a_fake_d, _ = discriminator(fake_a, num_layers + 1, initial_depth=depth,
-                                                                   scope='Discriminator_A', use_info=True, reuse=True)
+                                                                   scope='Discriminator_A', use_info=True,
+                                                                   dense_dim=dense_dim, reuse=True)
                 logits_b_fake, probs_b_fake = discriminator(x_ab, num_layers + 1, initial_depth=depth,
                                                             scope='Discriminator_B', reuse=True)
                 logits_a_fake, probs_a_fake, info_a_fake = discriminator(x_ba, num_layers + 1, initial_depth=depth,
                                                                          use_info=True, scope='Discriminator_A',
-                                                                         reuse=True)
+                                                                         dense_dim=dense_dim, reuse=True)
 
                 with tf.name_scope('logits'):
                     tf.summary.histogram('logits_a_real', logits_a_real)

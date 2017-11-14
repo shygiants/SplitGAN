@@ -31,6 +31,7 @@ def run(job_dir,
         weight_decay,
         num_layers,
         depth,
+        dense_dim,
         num_blocks,
         split_rate,
         gpu,
@@ -49,12 +50,12 @@ def run(job_dir,
         return features, labels
 
     # Define datasets
-    print paired_dataset
-
     if paired_dataset is not None:
         image_size = datasets_factory.get_image_size(paired_dataset)
+        dataset_name = paired_dataset
     else:
         image_size = datasets_factory.get_image_size(domain_a)
+        dataset_name = '{}2{}'.format(domain_a, domain_b)
 
     def get_dataset(split_name):
         if paired_dataset is not None:
@@ -89,11 +90,14 @@ def run(job_dir,
         'weight_decay': weight_decay,
         'num_layers': num_layers,
         'depth': depth,
+        'dense_dim': dense_dim,
         'num_blocks': num_blocks,
         'split_rate': split_rate,
         'use_joint_discr': use_joint_discr,
     }
     job_dir = os.path.join(job_dir,
+                           dataset_name,
+                           str(dense_dim),
                            str(depth),
                            str(num_layers),
                            str(split_rate),
@@ -266,6 +270,10 @@ if __name__ == '__main__':
                         type=int,
                         default=32,
                         help='Initial depth of ConvNets')
+    parser.add_argument('--dense-dim',
+                        type=int,
+                        default=512,
+                        help='Number of dimension encoded representation')
     parser.add_argument('--num-blocks',
                         type=int,
                         default=9,
